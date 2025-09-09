@@ -1,0 +1,812 @@
+$date
+	Tue Sep  9 22:51:31 2025
+$end
+$version
+	Icarus Verilog
+$end
+$timescale
+	1ps
+$end
+$scope module tb_single_img_synth $end
+$var wire 1 ! valid $end
+$var wire 1 " done $end
+$var wire 4 # digit [3:0] $end
+$var parameter 32 $ EXPECTED_DIGIT $end
+$var parameter 2 % TEST_IMG_SEL $end
+$var reg 1 & clk $end
+$var reg 2 ' img_sel [1:0] $end
+$var reg 1 ( rst $end
+$var reg 1 ) start $end
+$var integer 32 * cycle_count [31:0] $end
+$var real 1 + end_time $end
+$var integer 32 , i [31:0] $end
+$var real 1 - start_time $end
+$scope module dut $end
+$var wire 1 & clk $end
+$var wire 4 . digit [3:0] $end
+$var wire 2 / img_sel [1:0] $end
+$var wire 1 ( rst $end
+$var wire 1 ) start $end
+$var wire 1 ! valid $end
+$var wire 4 0 pred_digit [3:0] $end
+$var wire 1 " done $end
+$var parameter 32 1 IMG_SIZE $end
+$var parameter 32 2 NUM_IMGS $end
+$var reg 4 3 exp_label [3:0] $end
+$var reg 6272 4 img_data [6271:0] $end
+$var integer 32 5 i [31:0] $end
+$scope module accel $end
+$var wire 1 & clk $end
+$var wire 6272 6 img_data [6271:0] $end
+$var wire 4 7 pred_digit [3:0] $end
+$var wire 1 ( rst $end
+$var wire 1 8 start $end
+$var wire 10 9 row_idx [9:0] $end
+$var wire 1 : mac_en_l2 $end
+$var wire 1 ; mac_en_l1 $end
+$var wire 1 < mac_clr_l2 $end
+$var wire 1 = mac_clr_l1 $end
+$var wire 1 > load_img $end
+$var wire 2 ? layer_sel [1:0] $end
+$var wire 1 @ find_max $end
+$var wire 1 " done $end
+$var wire 10 A cycle_cnt [9:0] $end
+$var wire 8 B curr_pixel [7:0] $end
+$var wire 8 C curr_act [7:0] $end
+$var wire 1 D comp_l2 $end
+$var wire 1 E comp_l1 $end
+$var wire 1 F busy $end
+$var wire 4 G argmax_comb [3:0] $end
+$var wire 1 H apply_relu $end
+$var parameter 32 I HID_SIZE $end
+$var parameter 32 J IMG_SIZE $end
+$var parameter 32 K OUT_SIZE $end
+$var reg 4 L argmax_idx [3:0] $end
+$var reg 1 M l1_bias_done $end
+$var reg 1 N l2_bias_done $end
+$var reg 1 O mac_l1_init_bias $end
+$var reg 1 P mac_l2_init_bias $end
+$var reg 1 Q prev_apply_relu $end
+$var integer 32 R i [31:0] $end
+$scope module argmax $end
+$var wire 4 S max_idx [3:0] $end
+$var reg 4 T computed_idx [3:0] $end
+$var reg 20 U max_val [19:0] $end
+$upscope $end
+$scope module fsm $end
+$var wire 1 & clk $end
+$var wire 1 ( rst $end
+$var wire 1 8 start $end
+$var parameter 4 V ARGMAX $end
+$var parameter 4 W DONE $end
+$var parameter 4 X IDLE $end
+$var parameter 4 Y INIT $end
+$var parameter 4 Z L1_COMP $end
+$var parameter 4 [ L1_RELU $end
+$var parameter 4 \ L2_COMP $end
+$var parameter 4 ] LOAD_IMG $end
+$var reg 1 H apply_relu $end
+$var reg 1 F busy $end
+$var reg 1 E comp_l1 $end
+$var reg 1 D comp_l2 $end
+$var reg 10 ^ cycle_cnt [9:0] $end
+$var reg 1 " done $end
+$var reg 1 @ find_max $end
+$var reg 2 _ layer_sel [1:0] $end
+$var reg 1 > load_img $end
+$var reg 1 = mac_clr_l1 $end
+$var reg 1 < mac_clr_l2 $end
+$var reg 1 ; mac_en_l1 $end
+$var reg 1 : mac_en_l2 $end
+$var reg 4 ` next_state [3:0] $end
+$var reg 10 a row_idx [9:0] $end
+$var reg 4 b state [3:0] $end
+$upscope $end
+$scope module mac_l1 $end
+$var wire 1 & clk $end
+$var wire 1 = clr $end
+$var wire 1 ; en $end
+$var wire 1 O init_bias $end
+$var wire 8 c pixel [7:0] $end
+$var wire 1 ( rst $end
+$var integer 32 d i [31:0] $end
+$upscope $end
+$scope module mac_l2 $end
+$var wire 8 e activation [7:0] $end
+$var wire 1 & clk $end
+$var wire 1 < clr $end
+$var wire 1 : en $end
+$var wire 1 P init_bias $end
+$var wire 1 ( rst $end
+$var integer 32 f i [31:0] $end
+$upscope $end
+$scope module memory $end
+$var wire 1 & clk $end
+$var wire 2 g layer_sel [1:0] $end
+$var wire 10 h row_idx [9:0] $end
+$var wire 1 ( rst $end
+$var wire 9 i w2_base_addr [8:0] $end
+$var wire 15 j w1_base_addr [14:0] $end
+$var parameter 120 k B1_FILE $end
+$var parameter 120 l B2_FILE $end
+$var parameter 120 m W1_FILE $end
+$var parameter 120 n W2_FILE $end
+$var integer 32 o i [31:0] $end
+$upscope $end
+$scope module relu $end
+$var wire 1 & clk $end
+$var wire 1 H en $end
+$var wire 1 ( rst $end
+$var integer 32 p i [31:0] $end
+$upscope $end
+$upscope $end
+$upscope $end
+$upscope $end
+$enddefinitions $end
+$comment Show the parameter values. $end
+$dumpall
+b11001000110000101110100011000010101111101101101011001010110110100101111011101110011001000101110011011010110010101101101 n
+b11001000110000101110100011000010101111101101101011001010110110100101111011101110011000100101110011011010110010101101101 m
+b11001000110000101110100011000010101111101101101011001010110110100101111011000100011001000101110011011010110010101101101 l
+b11001000110000101110100011000010101111101101101011001010110110100101111011000100011000100101110011011010110010101101101 k
+b10 ]
+b101 \
+b100 [
+b11 Z
+b1 Y
+b0 X
+b111 W
+b110 V
+b1010 K
+b1100010000 J
+b100000 I
+b11 2
+b1100010000 1
+b11 %
+b0 $
+$end
+#0
+$dumpvars
+bx p
+b1010 o
+bx j
+bx i
+bx h
+bx g
+bx f
+bx e
+bx d
+bx c
+bx b
+bx a
+b0 `
+bx _
+bx ^
+bx U
+bx T
+bx S
+bx R
+xQ
+xP
+xO
+xN
+xM
+bx L
+xH
+bx G
+xF
+xE
+xD
+bx C
+bx B
+bx A
+x@
+bx ?
+x>
+x=
+x<
+x;
+x:
+bx 9
+08
+bx 7
+bx 6
+bx 5
+bx 4
+bx 3
+bx 0
+b11 /
+bx .
+r0 -
+bx ,
+r0 +
+b0 *
+0)
+1(
+b11 '
+0&
+bx #
+x"
+0!
+$end
+#5000
+b0 i
+b0 C
+b0 e
+b0 B
+b0 c
+b1010 o
+b0 G
+b0 S
+b0 T
+b0 U
+b0 b
+b0 A
+b0 ^
+0@
+0D
+0H
+0E
+0>
+0<
+0:
+0=
+0;
+b0 j
+b0 9
+b0 a
+b0 h
+b0 ?
+b0 _
+b0 g
+0F
+0"
+0N
+0M
+0P
+0O
+b0 #
+b0 .
+b0 0
+b0 7
+b0 L
+b0 3
+b0 4
+b0 6
+b100000 d
+b100000 p
+b1010 f
+b1100010000 R
+1&
+#10000
+0&
+#15000
+0Q
+b100000 R
+b1010 f
+b100000 p
+b100000 d
+1&
+#20000
+0&
+#25000
+b100000 d
+b100000 p
+b1010 f
+b1100010000 R
+1&
+#30000
+0&
+#35000
+b100000 R
+b1010 f
+b100000 p
+b100000 d
+1&
+#40000
+0&
+#45000
+b100000 d
+b100000 p
+b1010 f
+b1100010000 R
+1&
+#50000
+0&
+#55000
+b100000 R
+b1010 f
+b100000 p
+b100000 d
+1&
+#60000
+0&
+#65000
+b100000 d
+b100000 p
+b1010 f
+b1100010000 R
+1&
+#70000
+0&
+#75000
+b100000 R
+b1010 f
+b100000 p
+b100000 d
+1&
+#80000
+0&
+#85000
+b100000 d
+b100000 p
+b1010 f
+b1100010000 R
+1&
+#90000
+0&
+#95000
+b100000 R
+b1010 f
+b100000 p
+b100000 d
+1&
+#100000
+0&
+0(
+#105000
+1&
+#110000
+0&
+#115000
+1&
+#120000
+0&
+#125000
+1)
+1&
+#130000
+0&
+#135000
+0)
+1&
+#140000
+0&
+#145000
+1&
+#150000
+0&
+#155000
+1&
+#160000
+0&
+#165000
+1&
+#170000
+0&
+#175000
+1&
+#180000
+0&
+#185000
+1&
+#190000
+0&
+#195000
+1&
+#200000
+0&
+#205000
+1&
+#210000
+0&
+#215000
+1&
+#220000
+0&
+#225000
+1&
+#230000
+0&
+#235000
+1&
+#240000
+0&
+#245000
+1&
+#250000
+0&
+#255000
+1&
+#260000
+0&
+#265000
+1&
+#270000
+0&
+#275000
+1&
+#280000
+0&
+#285000
+1&
+#290000
+0&
+#295000
+1&
+#300000
+0&
+#305000
+1&
+#310000
+0&
+#315000
+1&
+#320000
+0&
+#325000
+1&
+#330000
+0&
+#335000
+1&
+#340000
+0&
+#345000
+1&
+#350000
+0&
+#355000
+1&
+#360000
+0&
+#365000
+1&
+#370000
+0&
+#375000
+1&
+#380000
+0&
+#385000
+1&
+#390000
+0&
+#395000
+1&
+#400000
+0&
+#405000
+1&
+#410000
+0&
+#415000
+1&
+#420000
+0&
+#425000
+1&
+#430000
+0&
+#435000
+1&
+#440000
+0&
+#445000
+1&
+#450000
+0&
+#455000
+1&
+#460000
+0&
+#465000
+1&
+#470000
+0&
+#475000
+1&
+#480000
+0&
+#485000
+1&
+#490000
+0&
+#495000
+1&
+#500000
+0&
+#505000
+1&
+#510000
+0&
+#515000
+1&
+#520000
+0&
+#525000
+1&
+#530000
+0&
+#535000
+1&
+#540000
+0&
+#545000
+1&
+#550000
+0&
+#555000
+1&
+#560000
+0&
+#565000
+1&
+#570000
+0&
+#575000
+1&
+#580000
+0&
+#585000
+1&
+#590000
+0&
+#595000
+1&
+#600000
+0&
+#605000
+1&
+#610000
+0&
+#615000
+1&
+#620000
+0&
+#625000
+1&
+#630000
+0&
+#635000
+1&
+#640000
+0&
+#645000
+1&
+#650000
+0&
+#655000
+1&
+#660000
+0&
+#665000
+1&
+#670000
+0&
+#675000
+1&
+#680000
+0&
+#685000
+1&
+#690000
+0&
+#695000
+1&
+#700000
+0&
+#705000
+1&
+#710000
+0&
+#715000
+1&
+#720000
+0&
+#725000
+1&
+#730000
+0&
+#735000
+1&
+#740000
+0&
+#745000
+1&
+#750000
+0&
+#755000
+1&
+#760000
+0&
+#765000
+1&
+#770000
+0&
+#775000
+1&
+#780000
+0&
+#785000
+1&
+#790000
+0&
+#795000
+1&
+#800000
+0&
+#805000
+1&
+#810000
+0&
+#815000
+1&
+#820000
+0&
+#825000
+1&
+#830000
+0&
+#835000
+1&
+#840000
+0&
+#845000
+1&
+#850000
+0&
+#855000
+1&
+#860000
+0&
+#865000
+1&
+#870000
+0&
+#875000
+1&
+#880000
+0&
+#885000
+1&
+#890000
+0&
+#895000
+1&
+#900000
+0&
+#905000
+1&
+#910000
+0&
+#915000
+1&
+#920000
+0&
+#925000
+1&
+#930000
+0&
+#935000
+1&
+#940000
+0&
+#945000
+1&
+#950000
+0&
+#955000
+1&
+#960000
+0&
+#965000
+1&
+#970000
+0&
+#975000
+1&
+#980000
+0&
+#985000
+1&
+#990000
+0&
+#995000
+1&
+#1000000
+0&
+#1005000
+1&
+#1010000
+0&
+#1015000
+1&
+#1020000
+0&
+#1025000
+1&
+#1030000
+0&
+#1035000
+1&
+#1040000
+0&
+#1045000
+1&
+#1050000
+0&
+#1055000
+1&
+#1060000
+0&
+#1065000
+1&
+#1070000
+0&
+#1075000
+1&
+#1080000
+0&
+#1085000
+1&
+#1090000
+0&
+#1095000
+1&
+#1100000
+0&
+#1105000
+1&
+#1110000
+0&
+#1115000
+1&
+#1120000
+0&
+#1125000
+1&
+#1130000
+0&
+#1135000
+1&
+#1140000
+0&
+#1145000
+1&
+#1150000
+0&
+#1155000
+1&
+#1160000
+0&
+#1165000
+1&
+#1170000
+0&
+#1175000
+1&
+#1180000
+0&
+#1185000
+1&
+#1190000
+0&
+#1195000
+1&
+#1200000
+0&
+#1205000
+1&
+#1210000
+0&
+#1215000
+1&
+#1220000
+0&
+#1225000
+1&
+#1230000
+0&
+#1235000
+1&
