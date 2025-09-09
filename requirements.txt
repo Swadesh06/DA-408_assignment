@@ -1,0 +1,3 @@
+# Core dependencies for MNIST FPGA Accelerator
+numpy==1.24.3
+tensorflow==2.13.0
