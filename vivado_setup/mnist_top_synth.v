@@ -32,6 +32,12 @@ module mnist_top_synth (
         test_labels[0] = 4'd6;  // First image is digit 6
         test_labels[1] = 4'd2;  // Second image is digit 2  
         test_labels[2] = 4'd3;  // Third image is digit 3
+        
+        // Debug: Print first few pixels of each image
+        $display("[TOP_MODULE] Test images loaded:");
+        $display("[TOP_MODULE] Image 0 pixels[0:3] = %h %h %h %h", test_imgs[0], test_imgs[1], test_imgs[2], test_imgs[3]);
+        $display("[TOP_MODULE] Image 1 pixels[0:3] = %h %h %h %h", test_imgs[784], test_imgs[785], test_imgs[786], test_imgs[787]);
+        $display("[TOP_MODULE] Image 2 pixels[0:3] = %h %h %h %h", test_imgs[1568], test_imgs[1569], test_imgs[1570], test_imgs[1571]);
     end
     
     // Image data preparation

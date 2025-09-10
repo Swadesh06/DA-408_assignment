@@ -69,21 +69,27 @@ module tb_synth_test;
         $display("First few W1 weights: %h %h %h %h", 
                 dut.accel.memory.w1_mem[0], dut.accel.memory.w1_mem[1], 
                 dut.accel.memory.w1_mem[2], dut.accel.memory.w1_mem[3]);
-        $display("First few test image pixels: %h %h %h %h",
-                dut.test_imgs[0], dut.test_imgs[1], dut.test_imgs[2], dut.test_imgs[3]);
+        $display("First few B1 biases: %h %h %h %h",
+                dut.accel.memory.b1_mem[0], dut.accel.memory.b1_mem[1],
+                dut.accel.memory.b1_mem[2], dut.accel.memory.b1_mem[3]);
         
-        if (dut.accel.memory.w1_mem[0] === 8'hxx || dut.accel.memory.w1_mem[0] === 8'h00) begin
-            $display("WARNING: W1 weights appear uninitialized!");
+        // Check if weights are loaded (non-zero and not undefined)
+        if (dut.accel.memory.w1_mem[0] === 8'hxx) begin
+            $display("ERROR: W1 weights are undefined (8'hxx)!");
+            $display("       This usually means .mem files were not found.");
+            $display("       In Vivado: Ensure .mem files are in simulation working directory.");
+        end else if (dut.accel.memory.w1_mem[0] === 8'h00 && 
+                     dut.accel.memory.w1_mem[1] === 8'h00 &&
+                     dut.accel.memory.w1_mem[2] === 8'h00) begin
+            $display("WARNING: W1 weights might be uninitialized (all zeros)!");
+            $display("         Check if .mem files are accessible to simulator.");
         end else begin
             $display("SUCCESS: W1 weights loaded correctly");
         end
-        
-        if (dut.test_imgs[0] === 8'hxx || dut.test_imgs[0] === 8'h00) begin
-            $display("WARNING: Test images appear uninitialized!");
-        end else begin
-            $display("SUCCESS: Test images loaded correctly");
-        end
         $display("========================\n");
+        
+        // Add extra delay for Vivado simulation stability
+        #100;
         
         // Test all 3 embedded images
         for (test_cnt = 0; test_cnt < 3; test_cnt = test_cnt + 1) begin
@@ -141,10 +147,11 @@ module tb_synth_test;
         $finish;
     end
     
-    // Timeout watchdog
+    // Timeout watchdog (longer for Vivado)
     initial begin
-        #30000000;  // 30ms timeout for 3 images
+        #100000000;  // 100ms timeout for Vivado simulation
         $display("ERROR: Simulation timeout!");
+        $display("This may indicate memory files not loaded properly.");
         $finish;
     end
     

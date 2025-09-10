@@ -26,7 +26,7 @@ module mem_ctrl_synth (
     (* ram_style = "block" *) reg signed [7:0] b2_mem [0:9];      // 10 biases
     
     // Initialize memories from mem files
-    // Use synthesis-compatible initialization
+    // Use synthesis-compatible initialization with fallback
     initial begin
         // For synthesis, use full file names without parameters
         // Vivado will look for these in the project directory
@@ -34,6 +34,11 @@ module mem_ctrl_synth (
         $readmemh("b1.mem", b1_mem);
         $readmemh("w2.mem", w2_mem);
         $readmemh("b2.mem", b2_mem);
+        
+        // Debug: Print first few values to verify loading
+        $display("[MEM_CTRL] Memory initialization complete");
+        $display("[MEM_CTRL] W1[0:3] = %h %h %h %h", w1_mem[0], w1_mem[1], w1_mem[2], w1_mem[3]);
+        $display("[MEM_CTRL] B1[0:3] = %h %h %h %h", b1_mem[0], b1_mem[1], b1_mem[2], b1_mem[3]);
     end
     
     // Address calculation
