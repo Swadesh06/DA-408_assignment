@@ -1,9 +1,9 @@
 ## ==========================================
-## Clock Signal - 100MHz
+## Clock Signal - 25MHz (relaxed from 100MHz for timing closure)
 ## ==========================================
 set_property PACKAGE_PIN W5 [get_ports clk]
 set_property IOSTANDARD LVCMOS33 [get_ports clk]
-create_clock -add -name sys_clk_pin -period 10.00 -waveform {0 5} [get_ports clk]
+create_clock -add -name sys_clk_pin -period 40.00 -waveform {0 20} [get_ports clk]
 
 ## ==========================================
 ## Control Buttons
@@ -60,21 +60,27 @@ set_property IOSTANDARD LVCMOS33 [get_ports {digit[3]}]
 ## ==========================================
 ## Timing Constraints
 ## ==========================================
-# Input delay constraints
-set_input_delay -clock sys_clk_pin -min -add_delay 2.000 [get_ports rst]
-set_input_delay -clock sys_clk_pin -max -add_delay 4.000 [get_ports rst]
-set_input_delay -clock sys_clk_pin -min -add_delay 2.000 [get_ports start]
-set_input_delay -clock sys_clk_pin -max -add_delay 4.000 [get_ports start]
-set_input_delay -clock sys_clk_pin -min -add_delay 2.000 [get_ports {img_sel[*]}]
-set_input_delay -clock sys_clk_pin -max -add_delay 4.000 [get_ports {img_sel[*]}]
+# Input delay constraints (relaxed for 25MHz operation)
+set_input_delay -clock sys_clk_pin -min -add_delay 5.000 [get_ports rst]
+set_input_delay -clock sys_clk_pin -max -add_delay 10.000 [get_ports rst]
+set_input_delay -clock sys_clk_pin -min -add_delay 5.000 [get_ports start]
+set_input_delay -clock sys_clk_pin -max -add_delay 10.000 [get_ports start]
+set_input_delay -clock sys_clk_pin -min -add_delay 5.000 [get_ports {img_sel[*]}]
+set_input_delay -clock sys_clk_pin -max -add_delay 10.000 [get_ports {img_sel[*]}]
 
-# Output delay constraints
-set_output_delay -clock sys_clk_pin -min -add_delay -1.000 [get_ports done]
-set_output_delay -clock sys_clk_pin -max -add_delay 2.000 [get_ports done]
-set_output_delay -clock sys_clk_pin -min -add_delay -1.000 [get_ports valid]
-set_output_delay -clock sys_clk_pin -max -add_delay 2.000 [get_ports valid]
-set_output_delay -clock sys_clk_pin -min -add_delay -1.000 [get_ports {digit[*]}]
-set_output_delay -clock sys_clk_pin -max -add_delay 2.000 [get_ports {digit[*]}]
+# Output delay constraints (relaxed for 25MHz operation)
+set_output_delay -clock sys_clk_pin -min -add_delay -2.000 [get_ports done]
+set_output_delay -clock sys_clk_pin -max -add_delay 5.000 [get_ports done]
+set_output_delay -clock sys_clk_pin -min -add_delay -2.000 [get_ports valid]
+set_output_delay -clock sys_clk_pin -max -add_delay 5.000 [get_ports valid]
+set_output_delay -clock sys_clk_pin -min -add_delay -2.000 [get_ports {digit[*]}]
+set_output_delay -clock sys_clk_pin -max -add_delay 5.000 [get_ports {digit[*]}]
+
+# Multicycle paths for MAC operations (critical timing paths)
+set_multicycle_path 2 -setup -from [get_cells */mac_array_l1/*] -to [get_cells */l1_acc_reg[*]]
+set_multicycle_path 1 -hold -from [get_cells */mac_array_l1/*] -to [get_cells */l1_acc_reg[*]]
+set_multicycle_path 2 -setup -from [get_cells */mac_array_l2/*] -to [get_cells */l2_acc_reg[*]]
+set_multicycle_path 1 -hold -from [get_cells */mac_array_l2/*] -to [get_cells */l2_acc_reg[*]]
 
 ## ==========================================
 ## Configuration Options

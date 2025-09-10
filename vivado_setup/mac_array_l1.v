@@ -30,11 +30,30 @@ module mac_array_l1 (
         end
     endgenerate
     
-    // Internal registers for accumulation
-    reg signed [15:0] prod [0:31];
+    // Internal registers for accumulation with pipeline stage
+    reg signed [15:0] prod_reg [0:31];  // Pipeline register for products
+    reg signed [7:0] pixel_reg;         // Pipeline register for pixel
+    reg signed [7:0] weights_reg [0:31]; // Pipeline register for weights
     integer i;
     
-    // Parallel MAC operations
+    // Pipeline stage 1: Register inputs and compute products
+    always @(posedge clk) begin
+        if (rst) begin
+            pixel_reg <= 8'sd0;
+            for (i = 0; i < 32; i = i + 1) begin
+                weights_reg[i] <= 8'sd0;
+                prod_reg[i] <= 16'sd0;
+            end
+        end else if (en) begin
+            pixel_reg <= pixel;
+            for (i = 0; i < 32; i = i + 1) begin
+                weights_reg[i] <= weights[i];
+                prod_reg[i] <= pixel * weights[i];  // Product computation
+            end
+        end
+    end
+    
+    // Pipeline stage 2: Accumulation
     always @(posedge clk) begin
         if (rst) begin
             for (i = 0; i < 32; i = i + 1) begin
@@ -50,10 +69,9 @@ module mac_array_l1 (
                 acc_out[i] <= {{4{biases[i][7]}}, biases[i], 8'b0};
             end
         end else if (en) begin
-            // Parallel multiply-accumulate
+            // Use pipelined product for accumulation
             for (i = 0; i < 32; i = i + 1) begin
-                prod[i] = pixel * weights[i];
-                acc_out[i] <= acc_out[i] + {{4{prod[i][15]}}, prod[i]};
+                acc_out[i] <= acc_out[i] + {{4{prod_reg[i][15]}}, prod_reg[i]};
             end
         end
     end

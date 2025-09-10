@@ -2,12 +2,7 @@
 // Compatible with both simulation and Vivado synthesis
 // Uses parameterized paths for flexibility
 
-module mem_ctrl_synth #(
-    parameter W1_FILE = "w1.mem",
-    parameter B1_FILE = "b1.mem", 
-    parameter W2_FILE = "w2.mem",
-    parameter B2_FILE = "b2.mem"
-)(
+module mem_ctrl_synth (
     input clk,
     input rst,
     
@@ -31,11 +26,14 @@ module mem_ctrl_synth #(
     (* ram_style = "block" *) reg signed [7:0] b2_mem [0:9];      // 10 biases
     
     // Initialize memories from mem files
+    // Use synthesis-compatible initialization
     initial begin
-        $readmemh(W1_FILE, w1_mem);
-        $readmemh(B1_FILE, b1_mem);
-        $readmemh(W2_FILE, w2_mem);
-        $readmemh(B2_FILE, b2_mem);
+        // For synthesis, use full file names without parameters
+        // Vivado will look for these in the project directory
+        $readmemh("w1.mem", w1_mem);
+        $readmemh("b1.mem", b1_mem);
+        $readmemh("w2.mem", w2_mem);
+        $readmemh("b2.mem", b2_mem);
     end
     
     // Address calculation
