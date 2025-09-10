@@ -113,11 +113,29 @@ module mnist_accel_synth (
     wire load_img, comp_l1, apply_relu, comp_l2, find_max;
     wire [9:0] cycle_cnt;
     
-    // Memory interface signals
+    // Memory interface signals - packed from mem_ctrl_synth
+    wire [255:0] w1_out_packed;  // 32 * 8 bits
+    wire [255:0] b1_out_packed;  // 32 * 8 bits
+    wire [79:0] w2_out_packed;   // 10 * 8 bits
+    wire [79:0] b2_out_packed;   // 10 * 8 bits
+    
+    // Unpack for internal use by other modules
     wire signed [7:0] w1_out [0:31];
     wire signed [7:0] b1_out [0:31];
     wire signed [7:0] w2_out [0:9];
     wire signed [7:0] b2_out [0:9];
+    
+    generate
+        genvar m;
+        for (m = 0; m < 32; m = m + 1) begin : unpack_w1_b1
+            assign w1_out[m] = w1_out_packed[m*8 +: 8];
+            assign b1_out[m] = b1_out_packed[m*8 +: 8];
+        end
+        for (m = 0; m < 10; m = m + 1) begin : unpack_w2_b2
+            assign w2_out[m] = w2_out_packed[m*8 +: 8];
+            assign b2_out[m] = b2_out_packed[m*8 +: 8];
+        end
+    endgenerate
     
     // Image buffer
     reg signed [7:0] img [0:783];
@@ -127,6 +145,20 @@ module mnist_accel_synth (
     wire signed [19:0] l1_acc [0:31];
     wire signed [7:0] l1_act [0:31];
     reg signed [7:0] l1_act_reg [0:31];
+    
+    // Packed signals for ReLU unit (Vivado synthesis compatibility)
+    wire [639:0] l1_acc_packed;  // 32 * 20 bits = 640 bits
+    wire [255:0] l1_act_packed;  // 32 * 8 bits = 256 bits
+    
+    generate
+        genvar n;
+        for (n = 0; n < 32; n = n + 1) begin : pack_l1_acc
+            assign l1_acc_packed[n*20 +: 20] = l1_acc[n];
+        end
+        for (n = 0; n < 32; n = n + 1) begin : unpack_l1_act
+            assign l1_act[n] = l1_act_packed[n*8 +: 8];
+        end
+    endgenerate
     
     // Layer 2 signals
     wire signed [19:0] l2_acc [0:9];
@@ -245,10 +277,10 @@ module mnist_accel_synth (
         .rst(rst),
         .layer_sel(layer_sel),
         .row_idx(row_idx),
-        .w1_out(w1_out),
-        .b1_out(b1_out),
-        .w2_out(w2_out),
-        .b2_out(b2_out)
+        .w1_out_packed(w1_out_packed),
+        .b1_out_packed(b1_out_packed),
+        .w2_out_packed(w2_out_packed),
+        .b2_out_packed(b2_out_packed)
     );
     
     // MAC Array Layer 1
@@ -269,8 +301,8 @@ module mnist_accel_synth (
         .clk(clk),
         .rst(rst),
         .en(apply_relu),
-        .z_in(l1_acc),
-        .a_out(l1_act)
+        .z_in_packed(l1_acc_packed),
+        .a_out_packed(l1_act_packed)
     );
     
     // MAC Array Layer 2
@@ -286,10 +318,19 @@ module mnist_accel_synth (
         .acc_out(l2_acc)
     );
     
+    // Pack l2_acc for argmax unit (Vivado synthesis compatibility)
+    wire [199:0] l2_acc_packed;  // 10 * 20 bits = 200 bits
+    generate
+        genvar j;
+        for (j = 0; j < 10; j = j + 1) begin : pack_l2_acc
+            assign l2_acc_packed[j*20 +: 20] = l2_acc[j];
+        end
+    endgenerate
+    
     // Argmax unit
     wire [3:0] argmax_comb;
     argmax_unit argmax (
-        .scores(l2_acc),
+        .scores_packed(l2_acc_packed),
         .max_idx(argmax_comb)
     );
     

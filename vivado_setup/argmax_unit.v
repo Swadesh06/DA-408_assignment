@@ -3,9 +3,18 @@
 // Synthesizable for Basys3 FPGA
 
 module argmax_unit (
-    input signed [19:0] scores [0:9],       // 10 output scores from Layer 2
+    input [199:0] scores_packed,            // 10 * 20-bit scores packed together
     output wire [3:0] max_idx               // Index of maximum (0-9)
 );
+    
+    // Unpack input scores for internal use
+    wire signed [19:0] scores [0:9];
+    generate
+        genvar i;
+        for (i = 0; i < 10; i = i + 1) begin : unpack_scores
+            assign scores[i] = scores_packed[i*20 +: 20];
+        end
+    endgenerate
     
     // Combinational logic for argmax computation
     reg signed [19:0] max_val;

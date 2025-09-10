@@ -6,9 +6,23 @@ module relu_unit (
     input clk,
     input rst,
     input en,                               // Enable signal
-    input signed [19:0] z_in [0:31],       // 32 pre-activation values
-    output reg signed [7:0] a_out [0:31]   // 32 post-activation values (requantized)
+    input [639:0] z_in_packed,             // 32 * 20-bit pre-activation values packed
+    output [255:0] a_out_packed            // 32 * 8-bit post-activation values packed
 );
+    
+    // Unpack inputs for internal processing
+    wire signed [19:0] z_in [0:31];
+    reg signed [7:0] a_out [0:31];
+    
+    generate
+        genvar j;
+        for (j = 0; j < 32; j = j + 1) begin : unpack_inputs
+            assign z_in[j] = z_in_packed[j*20 +: 20];
+        end
+        for (j = 0; j < 32; j = j + 1) begin : pack_outputs
+            assign a_out_packed[j*8 +: 8] = a_out[j];
+        end
+    endgenerate
     
     integer i;
     

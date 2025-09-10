@@ -15,13 +15,13 @@ module mem_ctrl_synth #(
     input [1:0] layer_sel,          // 0: idle, 1: L1, 2: L2
     input [9:0] row_idx,            // Current input index
     
-    // Layer 1 weight outputs (32 parallel outputs)
-    output reg signed [7:0] w1_out [0:31],
-    output reg signed [7:0] b1_out [0:31],
+    // Layer 1 weight outputs (packed for Vivado synthesis)
+    output reg [255:0] w1_out_packed,  // 32 * 8 bits = 256 bits
+    output reg [255:0] b1_out_packed,  // 32 * 8 bits = 256 bits
     
-    // Layer 2 weight outputs (10 parallel outputs)
-    output reg signed [7:0] w2_out [0:9],
-    output reg signed [7:0] b2_out [0:9]
+    // Layer 2 weight outputs (packed for Vivado synthesis)  
+    output reg [79:0] w2_out_packed,   // 10 * 8 bits = 80 bits
+    output reg [79:0] b2_out_packed    // 10 * 8 bits = 80 bits
 );
     
     // Memory arrays - will infer BRAM in Vivado
@@ -44,6 +44,25 @@ module mem_ctrl_synth #(
     
     assign w1_base_addr = row_idx * 32;
     assign w2_base_addr = row_idx * 10;
+    
+    // Internal unpacked arrays for easier indexing
+    reg signed [7:0] w1_out [0:31];
+    reg signed [7:0] b1_out [0:31];
+    reg signed [7:0] w2_out [0:9];
+    reg signed [7:0] b2_out [0:9];
+    
+    // Pack outputs for port compatibility  
+    generate
+        genvar k;
+        for (k = 0; k < 32; k = k + 1) begin : pack_w1_b1
+            assign w1_out_packed[k*8 +: 8] = w1_out[k];
+            assign b1_out_packed[k*8 +: 8] = b1_out[k];
+        end
+        for (k = 0; k < 10; k = k + 1) begin : pack_w2_b2
+            assign w2_out_packed[k*8 +: 8] = w2_out[k];
+            assign b2_out_packed[k*8 +: 8] = b2_out[k];
+        end
+    endgenerate
     
     // Combinational read for immediate response
     integer i;
