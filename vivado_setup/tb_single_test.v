@@ -213,11 +213,8 @@ module tb_single_test;
             end
             
             FINISHED: begin
-                wait_count <= wait_count + 1;
-                if (wait_count > 10) begin
-                    $display("TEST COMPLETE");
-                    $finish;
-                end
+                $display("TEST COMPLETE");
+                $finish;  // Finish immediately when done
             end
             
             default: state <= IDLE;
