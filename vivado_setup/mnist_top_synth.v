@@ -1,65 +1,56 @@
-// MNIST Top Module for FPGA Synthesis
-// Includes test image storage in BRAM for hardware testing
-// Supports 3 test images selectable via switches
+// MNIST Top Module for FPGA Synthesis - Simplified Version
+// Single test image hardcoded (test_img0 - digit 6)
+// No image selection - simplified for debugging
 
 module mnist_top_synth (
     input clk,
     input rst,           // btnC - center button
     input start,         // btnU - up button  
-    input [1:0] img_sel, // SW[1:0] - select test image (0-2)
     
     output [3:0] digit,  // LED[15:12] - predicted digit
-    output done,         // LED[0] - inference complete
-    output valid         // LED[1] - valid image selected
+    output done          // LED[0] - inference complete
 );
     
     // Network parameters
     localparam IMG_SIZE = 784;
-    localparam NUM_IMGS = 3;
     
-    // Test image storage in BRAM
-    (* ram_style = "block" *) reg [7:0] test_imgs [0:2351]; // 3 * 784
-    reg [3:0] test_labels [0:2];
+    // Single test image storage in BRAM (test_img0 - digit 6)
+    (* ram_style = "block" *) reg [7:0] test_img [0:783]; // Single image
+    reg [3:0] test_label;
     
-    // Initialize test images and labels
+    // Initialize single test image and label
     initial begin
-        // Load 3 test images
-        $readmemh("test_img0.mem", test_imgs, 0, 783);
-        $readmemh("test_img1.mem", test_imgs, 784, 1567);
-        $readmemh("test_img2.mem", test_imgs, 1568, 2351);
+        // Load single test image (digit 6)
+        $readmemh("test_img0.mem", test_img);
         
-        // Hardcode labels for the 3 test images
-        test_labels[0] = 4'd6;  // First image is digit 6
-        test_labels[1] = 4'd2;  // Second image is digit 2  
-        test_labels[2] = 4'd3;  // Third image is digit 3
+        // Hardcode label for test image
+        test_label = 4'd6;  // Test image is digit 6
         
-        // Debug: Print first few pixels of each image
-        $display("[TOP_MODULE] Test images loaded:");
-        $display("[TOP_MODULE] Image 0 pixels[0:3] = %h %h %h %h", test_imgs[0], test_imgs[1], test_imgs[2], test_imgs[3]);
-        $display("[TOP_MODULE] Image 1 pixels[0:3] = %h %h %h %h", test_imgs[784], test_imgs[785], test_imgs[786], test_imgs[787]);
-        $display("[TOP_MODULE] Image 2 pixels[0:3] = %h %h %h %h", test_imgs[1568], test_imgs[1569], test_imgs[1570], test_imgs[1571]);
+        // Debug: Print first few pixels and center pixels
+        $display("[TOP_MODULE] Single test image loaded:");
+        $display("[TOP_MODULE] Test image pixels[0:7] = %h %h %h %h %h %h %h %h", 
+                test_img[0], test_img[1], test_img[2], test_img[3],
+                test_img[4], test_img[5], test_img[6], test_img[7]);
+        $display("[TOP_MODULE] Center pixels[392:399] = %h %h %h %h %h %h %h %h",
+                test_img[392], test_img[393], test_img[394], test_img[395],
+                test_img[396], test_img[397], test_img[398], test_img[399]);
+        $display("[TOP_MODULE] Expected digit: %d", test_label);
     end
     
     // Image data preparation
     reg [6271:0] img_data;
-    reg [3:0] exp_label;
     wire [3:0] pred_digit;
     
-    // Valid image selection
-    assign valid = (img_sel < NUM_IMGS);
-    
-    // Load selected image into img_data
+    // Load test image into img_data when start is pressed
     integer i;
     always @(posedge clk) begin
         if (rst) begin
             img_data <= 0;
-            exp_label <= 0;
-        end else if (start && valid) begin
-            // Load selected image
+        end else if (start) begin
+            // Load the single test image
             for (i = 0; i < IMG_SIZE; i = i + 1) begin
-                img_data[i*8 +: 8] <= test_imgs[img_sel * IMG_SIZE + i];
+                img_data[i*8 +: 8] <= test_img[i];
             end
-            exp_label <= test_labels[img_sel];
         end
     end
     
@@ -67,7 +58,7 @@ module mnist_top_synth (
     mnist_accel_synth accel (
         .clk(clk),
         .rst(rst),
-        .start(start & valid),
+        .start(start),  // Direct connection, no validation needed
         .img_data(img_data),
         .pred_digit(pred_digit),
         .done(done)
@@ -80,10 +71,10 @@ module mnist_top_synth (
     always @(posedge done) begin
         if (done) begin
             $display("=== FPGA Inference Result ===");
-            $display("Test Image: %d", img_sel);
-            $display("Expected: %d", exp_label);
+            $display("Test Image: Fixed (test_img0.mem)");
+            $display("Expected: %d", test_label);
             $display("Predicted: %d", pred_digit);
-            if (pred_digit == exp_label) begin
+            if (pred_digit == test_label) begin
                 $display("Result: PASS");
             end else begin
                 $display("Result: FAIL");

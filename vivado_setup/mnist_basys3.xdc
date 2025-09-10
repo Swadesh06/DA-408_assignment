@@ -17,15 +17,9 @@ set_property PACKAGE_PIN T18 [get_ports start]
 set_property IOSTANDARD LVCMOS33 [get_ports start]
 
 ## ==========================================
-## Image Selection Switches
+## Image Selection Switches - REMOVED
 ## ==========================================
-# SW[0] - Image select bit 0
-set_property PACKAGE_PIN V17 [get_ports {img_sel[0]}]
-set_property IOSTANDARD LVCMOS33 [get_ports {img_sel[0]}]
-
-# SW[1] - Image select bit 1  
-set_property PACKAGE_PIN V16 [get_ports {img_sel[1]}]
-set_property IOSTANDARD LVCMOS33 [get_ports {img_sel[1]}]
+# No image selection - single test image hardcoded
 
 ## ==========================================
 ## Status LEDs
@@ -34,9 +28,9 @@ set_property IOSTANDARD LVCMOS33 [get_ports {img_sel[1]}]
 set_property PACKAGE_PIN U16 [get_ports done]
 set_property IOSTANDARD LVCMOS33 [get_ports done]
 
-# LED[1] - Valid image selected
-set_property PACKAGE_PIN E19 [get_ports valid]
-set_property IOSTANDARD LVCMOS33 [get_ports valid]
+# LED[1] - UNUSED (was valid signal)
+# set_property PACKAGE_PIN E19 [get_ports valid]
+# set_property IOSTANDARD LVCMOS33 [get_ports valid]
 
 ## ==========================================
 ## Predicted Digit Output LEDs
@@ -65,14 +59,12 @@ set_input_delay -clock sys_clk_pin -min -add_delay 5.000 [get_ports rst]
 set_input_delay -clock sys_clk_pin -max -add_delay 10.000 [get_ports rst]
 set_input_delay -clock sys_clk_pin -min -add_delay 5.000 [get_ports start]
 set_input_delay -clock sys_clk_pin -max -add_delay 10.000 [get_ports start]
-set_input_delay -clock sys_clk_pin -min -add_delay 5.000 [get_ports {img_sel[*]}]
-set_input_delay -clock sys_clk_pin -max -add_delay 10.000 [get_ports {img_sel[*]}]
+# Image selection delays removed - no img_sel port
 
 # Output delay constraints (relaxed for 25MHz operation)
 set_output_delay -clock sys_clk_pin -min -add_delay -2.000 [get_ports done]
 set_output_delay -clock sys_clk_pin -max -add_delay 5.000 [get_ports done]
-set_output_delay -clock sys_clk_pin -min -add_delay -2.000 [get_ports valid]
-set_output_delay -clock sys_clk_pin -max -add_delay 5.000 [get_ports valid]
+# Valid output delays removed - no valid port
 set_output_delay -clock sys_clk_pin -min -add_delay -2.000 [get_ports {digit[*]}]
 set_output_delay -clock sys_clk_pin -max -add_delay 5.000 [get_ports {digit[*]}]
 
