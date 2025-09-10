@@ -30,30 +30,11 @@ module mac_array_l2 (
         end
     endgenerate
     
-    // Internal registers for accumulation with pipeline stage
-    reg signed [15:0] prod_reg [0:9];    // Pipeline register for products
-    reg signed [7:0] act_reg;            // Pipeline register for activation
-    reg signed [7:0] weights_reg [0:9];  // Pipeline register for weights
+    // Internal registers for accumulation
+    reg signed [15:0] prod [0:9];
     integer i;
     
-    // Pipeline stage 1: Register inputs and compute products
-    always @(posedge clk) begin
-        if (rst) begin
-            act_reg <= 8'sd0;
-            for (i = 0; i < 10; i = i + 1) begin
-                weights_reg[i] <= 8'sd0;
-                prod_reg[i] <= 16'sd0;
-            end
-        end else if (en) begin
-            act_reg <= activation;
-            for (i = 0; i < 10; i = i + 1) begin
-                weights_reg[i] <= weights[i];
-                prod_reg[i] <= activation * weights[i];  // Product computation
-            end
-        end
-    end
-    
-    // Pipeline stage 2: Accumulation
+    // Parallel MAC operations - simplified without pipeline
     always @(posedge clk) begin
         if (rst) begin
             for (i = 0; i < 10; i = i + 1) begin
@@ -69,9 +50,10 @@ module mac_array_l2 (
                 acc_out[i] <= {{12{biases[i][7]}}, biases[i]};
             end
         end else if (en) begin
-            // Use pipelined product for accumulation
+            // Parallel multiply-accumulate
             for (i = 0; i < 10; i = i + 1) begin
-                acc_out[i] <= acc_out[i] + {{4{prod_reg[i][15]}}, prod_reg[i]};
+                prod[i] = activation * weights[i];
+                acc_out[i] <= acc_out[i] + {{4{prod[i][15]}}, prod[i]};
             end
         end
     end

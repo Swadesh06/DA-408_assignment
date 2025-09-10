@@ -79,8 +79,8 @@ module ctrl_fsm (
             
             L1_COMP: begin
                 // Process 784 inputs through 32 parallel MACs
-                // Need 788 cycles: 1 for bias init + 1 for setup + 784 for processing + 2 pipeline
-                if (cycle_cnt >= 788) begin
+                // Need 786 cycles: 1 for bias init + 1 for setup + 784 for processing
+                if (cycle_cnt >= 786) begin
                     next_state = L1_RELU;
                 end
             end
@@ -96,8 +96,8 @@ module ctrl_fsm (
             
             L2_COMP: begin
                 // Process 32 inputs through 10 parallel MACs
-                // Need 35 cycles: 1 for enable setup + 32 for processing + 2 pipeline
-                if (cycle_cnt >= 35) begin
+                // Need 33 cycles: 1 for enable setup + 32 for processing
+                if (cycle_cnt >= 33) begin
                     next_state = ARGMAX;
                 end
             end
