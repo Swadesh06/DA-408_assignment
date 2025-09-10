@@ -16,12 +16,12 @@ module mem_ctrl_synth #(
     input [9:0] row_idx,            // Current input index
     
     // Layer 1 weight outputs (packed for Vivado synthesis)
-    output reg [255:0] w1_out_packed,  // 32 * 8 bits = 256 bits
-    output reg [255:0] b1_out_packed,  // 32 * 8 bits = 256 bits
+    output [255:0] w1_out_packed,  // 32 * 8 bits = 256 bits
+    output [255:0] b1_out_packed,  // 32 * 8 bits = 256 bits
     
     // Layer 2 weight outputs (packed for Vivado synthesis)  
-    output reg [79:0] w2_out_packed,   // 10 * 8 bits = 80 bits
-    output reg [79:0] b2_out_packed    // 10 * 8 bits = 80 bits
+    output [79:0] w2_out_packed,   // 10 * 8 bits = 80 bits
+    output [79:0] b2_out_packed    // 10 * 8 bits = 80 bits
 );
     
     // Memory arrays - will infer BRAM in Vivado
