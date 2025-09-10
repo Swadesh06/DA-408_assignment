@@ -21,10 +21,10 @@ module tb_synth_test;
     integer test_cnt;
     reg [3:0] exp_labels [0:2];  // Expected labels for 3 test images
     
-    // Clock generation - 100MHz
+    // Clock generation - 25MHz (matches constraints)
     initial begin
         clk = 0;
-        forever #5 clk = ~clk;
+        forever #20 clk = ~clk;  // 40ns period = 25MHz
     end
     
     // Expected labels for the 3 test images

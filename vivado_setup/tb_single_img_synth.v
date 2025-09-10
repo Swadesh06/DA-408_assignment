@@ -39,11 +39,11 @@ module tb_single_img_synth;
     integer i;
     
     // ==========================================
-    // Clock generation - 100MHz
+    // Clock generation - 25MHz (matches constraints)
     // ==========================================
     initial begin
         clk = 0;
-        forever #5 clk = ~clk;  // 10ns period = 100MHz
+        forever #20 clk = ~clk;  // 40ns period = 25MHz
     end
     
     // ==========================================
@@ -135,7 +135,7 @@ module tb_single_img_synth;
             $display("Performance Metrics:");
             $display("  Inference Cycles: %d", cycle_count);
             $display("  Inference Time: %.2f ns", end_time - start_time);
-            $display("  Clock Frequency: 100 MHz");
+            $display("  Clock Frequency: 25 MHz");
             $display("  Real Time: %.2f us", (end_time - start_time) / 1000);
             $display("==========================================\n");
             
@@ -205,9 +205,9 @@ module tb_single_img_synth;
             $display("\n[FPGA Console Output Expected]:");
             $display("=== FPGA Inference Result ===");
             $display("Test Image: %d", img_sel);
-            $display("Expected: %d", dut.exp_label);
+            $display("Expected: %d", EXPECTED_DIGIT);
             $display("Predicted: %d", digit);
-            if (digit == dut.exp_label) begin
+            if (digit == EXPECTED_DIGIT) begin
                 $display("Result: PASS");
             end else begin
                 $display("Result: FAIL");
