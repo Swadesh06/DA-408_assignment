@@ -1,124 +1,68 @@
-// MNIST Top Module for FPGA Synthesis - Simplified Version
-// Single test image hardcoded (test_img0 - digit 6)
-// No image selection - simplified for debugging
+// MNIST Hardware Accelerator Top Module
+// Test image loaded from test_img0.mem (change line 24 for different images)
 
 module mnist_top_synth (
     input clk,
-    input rst,           // btnC - center button
-    input start,         // btnU - up button  
-    
-    output [3:0] digit,  // LED[15:12] - predicted digit
-    output done          // LED[0] - inference complete
+    input rst,
+    input start,
+    output [3:0] digit,
+    output done
 );
-    
-    // Network parameters
+
     localparam IMG_SIZE = 784;
-    
-    // Single test image storage in BRAM (test_img0 - digit 6)
-    (* ram_style = "block" *) reg [7:0] test_img [0:783]; // Single image
+
+    (* ram_style = "block" *) reg [7:0] test_img [0:783];
     reg [3:0] test_label;
-    
-    // Initialize single test image and label
+
     initial begin
-        // Load single test image (digit 6)
         $readmemh("test_img0.mem", test_img);
-        
-        // Hardcode label for test image
-        test_label = 4'd6;  // Test image is digit 6
-        
-        // Debug: Print first few pixels and center pixels
-        $display("[TOP_MODULE] Single test image loaded:");
-        $display("[TOP_MODULE] Test image pixels[0:7] = %h %h %h %h %h %h %h %h", 
-                test_img[0], test_img[1], test_img[2], test_img[3],
-                test_img[4], test_img[5], test_img[6], test_img[7]);
-        $display("[TOP_MODULE] Center pixels[392:399] = %h %h %h %h %h %h %h %h",
-                test_img[392], test_img[393], test_img[394], test_img[395],
-                test_img[396], test_img[397], test_img[398], test_img[399]);
-        
-        // Additional verification of image content
-        $display("[TOP_MODULE] Critical pixels [400:407] = %h %h %h %h %h %h %h %h",
-                test_img[400], test_img[401], test_img[402], test_img[403],
-                test_img[404], test_img[405], test_img[406], test_img[407]);
-        $display("[TOP_MODULE] Expected digit: %d", test_label);
-        
-        // Verify non-zero pixel count
-        #1;  // Wait for image to fully load
-        $display("[TOP_MODULE] Image loading verification complete");
+        test_label = 4'd6;
+        $display("[TOP_MODULE] Test image loaded, expected digit: %d", test_label);
     end
-    
-    // Image data preparation
+
     reg [6271:0] img_data;
     wire [3:0] pred_digit;
-    
-    // Load test image into img_data when start is pressed
+
+    // Pack test image into img_data on start signal
     integer i;
-    reg start_prev;
     always @(posedge clk) begin
-        start_prev <= start;
         if (rst) begin
             img_data <= 0;
         end else if (start) begin
-            // Load the single test image
             for (i = 0; i < IMG_SIZE; i = i + 1) begin
                 img_data[i*8 +: 8] <= test_img[i];
             end
-            // Debug when start is first asserted
-            if (!start_prev) begin
-                $display("[IMG_LOAD] Loading image data on start pulse");
-                $display("[IMG_LOAD] Sample pixels being loaded: %h %h %h %h",
-                        test_img[400], test_img[401], test_img[402], test_img[403]);
-            end
         end
     end
-    
-    // Instantiate accelerator with synthesis-compatible memory controller
+
     mnist_accel_synth accel (
         .clk(clk),
         .rst(rst),
-        .start(start),  // Direct connection, no validation needed
+        .start(start),
         .img_data(img_data),
         .pred_digit(pred_digit),
         .done(done)
     );
-    
-    // Output predicted digit
+
     assign digit = pred_digit;
-    
-    // Debug output for Vivado console (synthesis will optimize away)
-    always @(posedge done) begin
-        if (done) begin
-            $display("=== FPGA Inference Result ===");
-            $display("Test Image: Fixed (test_img0.mem)");
-            $display("Expected: %d", test_label);
-            $display("Predicted: %d", pred_digit);
-            if (pred_digit == test_label) begin
-                $display("Result: PASS");
-            end else begin
-                $display("Result: FAIL");
-            end
-            $display("============================");
-        end
-    end
-    
+
 endmodule
 
-// Modified accelerator using synthesis-compatible memory controller
+// MNIST Accelerator Core
 module mnist_accel_synth (
     input clk,
     input rst,
     input start,
     input [6271:0] img_data,
-    
     output [3:0] pred_digit,
     output done
 );
-    
-    // Network parameters
+
     localparam IMG_SIZE = 784;
     localparam HID_SIZE = 32;
     localparam OUT_SIZE = 10;
-    
-    // Control signals from FSM
+
+    // Control signals
     wire busy;
     wire [1:0] layer_sel;
     wire [9:0] row_idx;
@@ -126,19 +70,17 @@ module mnist_accel_synth (
     wire mac_en_l2, mac_clr_l2;
     wire load_img, comp_l1, apply_relu, comp_l2, find_max;
     wire [9:0] cycle_cnt;
-    
-    // Memory interface signals - packed from mem_ctrl_synth
-    wire [255:0] w1_out_packed;  // 32 * 8 bits
-    wire [255:0] b1_out_packed;  // 32 * 8 bits
-    wire [79:0] w2_out_packed;   // 10 * 8 bits
-    wire [79:0] b2_out_packed;   // 10 * 8 bits
-    
-    // Unpack for internal use by other modules
+
+    // Memory interface (packed for synthesis)
+    wire [255:0] w1_out_packed, b1_out_packed;
+    wire [79:0] w2_out_packed, b2_out_packed;
+
+    // Unpacked weights and biases
     wire signed [7:0] w1_out [0:31];
     wire signed [7:0] b1_out [0:31];
     wire signed [7:0] w2_out [0:9];
     wire signed [7:0] b2_out [0:9];
-    
+
     generate
         genvar m;
         for (m = 0; m < 32; m = m + 1) begin : unpack_w1_b1
@@ -150,20 +92,20 @@ module mnist_accel_synth (
             assign b2_out[m] = b2_out_packed[m*8 +: 8];
         end
     endgenerate
-    
+
     // Image buffer
     reg signed [7:0] img [0:783];
     wire signed [7:0] curr_pixel;
-    
+
     // Layer 1 signals
     wire signed [19:0] l1_acc [0:31];
     wire signed [7:0] l1_act [0:31];
     reg signed [7:0] l1_act_reg [0:31];
-    
+
     // Packed signals for module interfaces (Vivado synthesis compatibility)
     wire [639:0] l1_acc_packed;  // 32 * 20 bits = 640 bits (from MAC L1)
     wire [255:0] l1_act_packed;  // 32 * 8 bits = 256 bits (from ReLU)
-    
+
     // Unpack signals for internal use
     generate
         genvar n;
@@ -172,23 +114,23 @@ module mnist_accel_synth (
             assign l1_act[n] = l1_act_packed[n*8 +: 8];
         end
     endgenerate
-    
+
     // Layer 2 signals
     wire signed [19:0] l2_acc [0:9];
     wire signed [7:0] curr_act;
-    
+
     // Output signals
     reg [3:0] argmax_idx;
-    
+
     // Control signals for MAC arrays
     reg mac_l1_init_bias;
     reg mac_l2_init_bias;
-    
+
     integer i;
-    
+
     // Image loading and pixel selection
     assign curr_pixel = (comp_l1 && row_idx < IMG_SIZE) ? img[row_idx] : 8'sd0;
-    
+
     always @(posedge clk) begin
         if (rst) begin
             for (i = 0; i < IMG_SIZE; i = i + 1) begin
@@ -201,17 +143,17 @@ module mnist_accel_synth (
             // Debug image loading into accelerator
             $display("[ACCEL] Image loaded into accelerator");
             $display("[ACCEL] Sample pixels from img_data: %h %h %h %h",
-                    img_data[400*8 +: 8], img_data[401*8 +: 8], 
+                    img_data[400*8 +: 8], img_data[401*8 +: 8],
                     img_data[402*8 +: 8], img_data[403*8 +: 8]);
         end
     end
-    
+
     // Layer 1 activation register
     reg prev_apply_relu;
     always @(posedge clk) begin
         prev_apply_relu <= apply_relu;
     end
-    
+
     always @(posedge clk) begin
         if (rst) begin
             for (i = 0; i < HID_SIZE; i = i + 1) begin
@@ -223,14 +165,14 @@ module mnist_accel_synth (
             end
         end
     end
-    
+
     // Layer 2 activation selection
     assign curr_act = (comp_l2 && row_idx < HID_SIZE) ? l1_act_reg[row_idx] : 8'sd0;
-    
+
     // Bias initialization control
     reg l1_bias_done;
     reg l2_bias_done;
-    
+
     always @(posedge clk) begin
         if (rst) begin
             mac_l1_init_bias <= 1'b0;
@@ -243,19 +185,19 @@ module mnist_accel_synth (
             end else begin
                 mac_l1_init_bias <= 1'b0;
             end
-            
+
             if (mac_l1_init_bias) begin
                 l1_bias_done <= 1'b1;
             end else if (!comp_l1) begin
                 l1_bias_done <= 1'b0;
             end
-            
+
             if (comp_l2 && !l2_bias_done) begin
                 mac_l2_init_bias <= 1'b1;
             end else begin
                 mac_l2_init_bias <= 1'b0;
             end
-            
+
             if (mac_l2_init_bias) begin
                 l2_bias_done <= 1'b1;
             end else if (!comp_l2) begin
@@ -263,9 +205,9 @@ module mnist_accel_synth (
             end
         end
     end
-    
+
     // Module instantiations
-    
+
     // Control FSM
     ctrl_fsm fsm (
         .clk(clk),
@@ -286,7 +228,7 @@ module mnist_accel_synth (
         .find_max(find_max),
         .cycle_cnt(cycle_cnt)
     );
-    
+
     // Memory Controller with synthesis paths
     mem_ctrl_synth memory (
         .clk(clk),
@@ -298,7 +240,7 @@ module mnist_accel_synth (
         .w2_out_packed(w2_out_packed),
         .b2_out_packed(b2_out_packed)
     );
-    
+
     // MAC Array Layer 1
     mac_array_l1 mac_l1 (
         .clk(clk),
@@ -311,7 +253,7 @@ module mnist_accel_synth (
         .biases_packed(b1_out_packed),
         .acc_out_packed(l1_acc_packed)
     );
-    
+
     // ReLU Unit
     relu_unit relu (
         .clk(clk),
@@ -320,10 +262,10 @@ module mnist_accel_synth (
         .z_in_packed(l1_acc_packed),
         .a_out_packed(l1_act_packed)
     );
-    
+
     // Packed signal for Layer 2 output (from MAC to argmax)
     wire [199:0] l2_acc_packed;  // 10 * 20 bits = 200 bits
-    
+
     // Unpack l2_acc from packed version for internal use
     generate
         genvar j;
@@ -331,7 +273,7 @@ module mnist_accel_synth (
             assign l2_acc[j] = l2_acc_packed[j*20 +: 20];
         end
     endgenerate
-    
+
     // MAC Array Layer 2
     mac_array_l2 mac_l2 (
         .clk(clk),
@@ -344,14 +286,14 @@ module mnist_accel_synth (
         .biases_packed(b2_out_packed),
         .acc_out_packed(l2_acc_packed)
     );
-    
+
     // Argmax unit
     wire [3:0] argmax_comb;
     argmax_unit argmax (
         .scores_packed(l2_acc_packed),
         .max_idx(argmax_comb)
     );
-    
+
     // Register argmax result
     always @(posedge clk) begin
         if (rst) begin
@@ -360,8 +302,8 @@ module mnist_accel_synth (
             argmax_idx <= argmax_comb;
         end
     end
-    
+
     // Output assignment
     assign pred_digit = argmax_idx;
-    
+
 endmodule

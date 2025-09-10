@@ -1,24 +1,22 @@
-// MAC Array Layer 2 - 10 parallel MAC units for second layer computation
-// Processes 32 hidden neurons in parallel across 10 output neurons
-// Synthesizable for Basys3 FPGA - Fixed for Vivado synthesis
+// Layer 2 MAC Array - 10 parallel multiply-accumulate units
 
 module mac_array_l2 (
     input clk,
     input rst,
-    input en,                               // Enable signal
-    input clr,                              // Clear accumulators
-    input init_bias,                        // Initialize with biases
-    input signed [7:0] activation,          // Current activation value (shared across all MACs)
-    input [79:0] weights_packed,            // 10 * 8-bit weights packed
-    input [79:0] biases_packed,             // 10 * 8-bit biases packed
-    output [199:0] acc_out_packed           // 10 * 20-bit accumulator outputs packed
+    input en,
+    input clr,
+    input init_bias,
+    input signed [7:0] activation,
+    input [79:0] weights_packed,
+    input [79:0] biases_packed,
+    output [199:0] acc_out_packed
 );
-    
+
     // Unpack inputs for internal use
     wire signed [7:0] weights [0:9];
     wire signed [7:0] biases [0:9];
     reg signed [19:0] acc_out [0:9];
-    
+
     generate
         genvar j;
         for (j = 0; j < 10; j = j + 1) begin : unpack_inputs
@@ -29,11 +27,11 @@ module mac_array_l2 (
             assign acc_out_packed[j*20 +: 20] = acc_out[j];
         end
     endgenerate
-    
+
     // Internal registers for accumulation
     reg signed [15:0] prod [0:9];
     integer i;
-    
+
     // Parallel MAC operations - simplified without pipeline
     always @(posedge clk) begin
         if (rst) begin
@@ -57,5 +55,5 @@ module mac_array_l2 (
             end
         end
     end
-    
+
 endmodule

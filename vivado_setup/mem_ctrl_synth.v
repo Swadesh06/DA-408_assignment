@@ -1,60 +1,44 @@
-// Memory Controller for Synthesis - BRAM-based weight and bias storage
-// Compatible with both simulation and Vivado synthesis
-// Uses parameterized paths for flexibility
+// Memory Controller - BRAM-based weight and bias storage
 
 module mem_ctrl_synth (
     input clk,
     input rst,
-    
-    // Control signals
-    input [1:0] layer_sel,          // 0: idle, 1: L1, 2: L2
-    input [9:0] row_idx,            // Current input index
-    
-    // Layer 1 weight outputs (packed for Vivado synthesis)
-    output [255:0] w1_out_packed,  // 32 * 8 bits = 256 bits
-    output [255:0] b1_out_packed,  // 32 * 8 bits = 256 bits
-    
-    // Layer 2 weight outputs (packed for Vivado synthesis)  
-    output [79:0] w2_out_packed,   // 10 * 8 bits = 80 bits
-    output [79:0] b2_out_packed    // 10 * 8 bits = 80 bits
+    input [1:0] layer_sel,
+    input [9:0] row_idx,
+    output [255:0] w1_out_packed,
+    output [255:0] b1_out_packed,
+    output [79:0] w2_out_packed,
+    output [79:0] b2_out_packed
 );
-    
+
     // Memory arrays - will infer BRAM in Vivado
     (* ram_style = "block" *) reg signed [7:0] w1_mem [0:25087];  // 784 * 32
     (* ram_style = "block" *) reg signed [7:0] b1_mem [0:31];     // 32 biases
     (* ram_style = "block" *) reg signed [7:0] w2_mem [0:319];    // 32 * 10
     (* ram_style = "block" *) reg signed [7:0] b2_mem [0:9];      // 10 biases
-    
-    // Initialize memories from mem files
-    // Use synthesis-compatible initialization with fallback
+
+    // Load weights and biases from memory files
     initial begin
-        // For synthesis, use full file names without parameters
-        // Vivado will look for these in the project directory
         $readmemh("w1.mem", w1_mem);
         $readmemh("b1.mem", b1_mem);
         $readmemh("w2.mem", w2_mem);
         $readmemh("b2.mem", b2_mem);
-        
-        // Debug: Print first few values to verify loading
-        $display("[MEM_CTRL] Memory initialization complete");
-        $display("[MEM_CTRL] W1[0:3] = %h %h %h %h", w1_mem[0], w1_mem[1], w1_mem[2], w1_mem[3]);
-        $display("[MEM_CTRL] B1[0:3] = %h %h %h %h", b1_mem[0], b1_mem[1], b1_mem[2], b1_mem[3]);
     end
-    
+
     // Address calculation
     wire [14:0] w1_base_addr;
     wire [8:0] w2_base_addr;
-    
+
     assign w1_base_addr = row_idx * 32;
     assign w2_base_addr = row_idx * 10;
-    
+
     // Internal unpacked arrays for easier indexing
     reg signed [7:0] w1_out [0:31];
     reg signed [7:0] b1_out [0:31];
     reg signed [7:0] w2_out [0:9];
     reg signed [7:0] b2_out [0:9];
-    
-    // Pack outputs for port compatibility  
+
+    // Pack outputs for port compatibility
     generate
         genvar k;
         for (k = 0; k < 32; k = k + 1) begin : pack_w1_b1
@@ -66,10 +50,10 @@ module mem_ctrl_synth (
             assign b2_out_packed[k*8 +: 8] = b2_out[k];
         end
     endgenerate
-    
+
     // Combinational read for immediate response
     integer i;
-    
+
     always @(*) begin
         // Default values
         for (i = 0; i < 32; i = i + 1) begin
@@ -80,7 +64,7 @@ module mem_ctrl_synth (
             w2_out[i] = 8'sd0;
             b2_out[i] = 8'sd0;
         end
-        
+
         case (layer_sel)
             2'd1: begin  // Layer 1 active
                 // Output 32 weights in parallel
@@ -89,7 +73,7 @@ module mem_ctrl_synth (
                     b1_out[i] = b1_mem[i];
                 end
             end
-            
+
             2'd2: begin  // Layer 2 active
                 // Output 10 weights in parallel
                 for (i = 0; i < 10; i = i + 1) begin
@@ -97,11 +81,11 @@ module mem_ctrl_synth (
                     b2_out[i] = b2_mem[i];
                 end
             end
-            
+
             default: begin
                 // Keep default zeros
             end
         endcase
     end
-    
+
 endmodule
