@@ -194,12 +194,6 @@ test_images/test_img_digit9.mem    # Expected output: 9
 - **Throughput**: 31,250 inferences/second
 - **Speedup vs Sequential**: 31.25× faster
 
-## Resource Utilization (Basys3)
-- **LUTs**: ~4,200 / 20,800 (20%)
-- **Flip-Flops**: ~2,800 / 41,600 (7%)
-- **BRAM**: ~15 / 50 (30%)
-- **DSP48**: ~42 / 90 (47%)
-
 ## Architecture Overview
 
 ### Pipeline Stages
@@ -215,22 +209,3 @@ test_images/test_img_digit9.mem    # Expected output: 9
 - **MAC Arrays**: Perform parallel multiply-accumulate operations
 - **ReLU Unit**: Applies activation function with requantization
 - **Argmax Unit**: Determines final classification result
-
-## Troubleshooting
-
-### Simulation Issues
-- Verify simulation runtime set to 100μs (not default 1000ns)
-- Check all .mem files are in project directory
-- Ensure tb_single_test.v is set as simulation top module
-
-### Synthesis Issues  
-- Confirm mnist_top_synth.v is design top module
-- Verify all source files are added to project
-- Check memory file paths are correct in $readmemh calls
-
-### Implementation Issues
-- Verify timing constraints are met
-- Check resource utilization within FPGA limits
-- Ensure constraint file properly applied
-
-All files are synthesis-ready with no further modifications required.
