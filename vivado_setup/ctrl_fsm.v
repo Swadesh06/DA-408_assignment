@@ -218,7 +218,7 @@ module ctrl_fsm (
                         apply_relu <= 1'b0;  // ReLU output stabilizes
                         cycle_cnt <= cycle_cnt + 1;
                     end else begin
-                        apply_relu <= 1'b0;  // L2 bias init happens
+                        apply_relu <= 1'b0;  // Prepare for L2_COMP
                         cycle_cnt <= 10'd0;  // Reset for L2_COMP
                     end
                 end

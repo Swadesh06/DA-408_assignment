@@ -17,11 +17,6 @@ set_property PACKAGE_PIN T18 [get_ports start]
 set_property IOSTANDARD LVCMOS33 [get_ports start]
 
 ## ==========================================
-## Image Selection Switches - REMOVED
-## ==========================================
-# No image selection - single test image hardcoded
-
-## ==========================================
 ## Status LEDs
 ## ==========================================
 # LED[0] - Done signal

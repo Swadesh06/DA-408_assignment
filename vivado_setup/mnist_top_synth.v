@@ -228,7 +228,7 @@ module mnist_accel_synth (
                 l1_bias_done <= 1'b0;
             end
             
-            if (apply_relu && !l2_bias_done) begin
+            if (comp_l2 && !l2_bias_done) begin
                 mac_l2_init_bias <= 1'b1;
             end else begin
                 mac_l2_init_bias <= 1'b0;
@@ -236,9 +236,7 @@ module mnist_accel_synth (
             
             if (mac_l2_init_bias) begin
                 l2_bias_done <= 1'b1;
-            end else if (apply_relu && l2_bias_done) begin
-                l2_bias_done <= 1'b1;
-            end else if (!apply_relu) begin
+            end else if (!comp_l2) begin
                 l2_bias_done <= 1'b0;
             end
         end
