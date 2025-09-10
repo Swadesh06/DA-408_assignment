@@ -112,6 +112,19 @@ module tb_single_test;
                     end else begin
                         $display("SUCCESS: Weights loaded correctly");
                     end
+                    
+                    // Detailed test image verification
+                    if (dut.test_img[0] === 8'hxx) begin
+                        $display("ERROR: Test image not loaded!");
+                    end else if (dut.test_img[0] === 8'h00 && 
+                               dut.test_img[1] === 8'h00 && 
+                               dut.test_img[10] === 8'h00 && 
+                               dut.test_img[100] === 8'h00) begin
+                        $display("WARNING: Test image appears to be all zeros!");
+                        $display("Check if test_img0.mem file exists in Vivado project directory");
+                    end else begin
+                        $display("SUCCESS: Test image loaded with non-zero data");
+                    end
                     $display("====================\n");
                 end
             end
@@ -139,12 +152,25 @@ module tb_single_test;
                 start <= 0;  // Clear start after one cycle
                 cycle_count <= cycle_count + 1;
                 
+                // Detailed FSM monitoring every 100 cycles
+                if (cycle_count % 100 == 0) begin
+                    $display("Progress: Cycle %d, FSM State %d, Done=%b", 
+                            cycle_count, dut.accel.fsm.state, done);
+                    $display("  FSM Details: comp_l1=%b, comp_l2=%b, find_max=%b", 
+                            dut.accel.fsm.comp_l1, dut.accel.fsm.comp_l2, dut.accel.fsm.find_max);
+                    $display("  Cycle_cnt=%d, row_idx=%d", 
+                            dut.accel.fsm.cycle_cnt, dut.accel.fsm.row_idx);
+                end
+                
                 if (done) begin
                     state <= CHECK;
                     $display("Inference complete after %d cycles", cycle_count);
-                end else if (cycle_count > 2000) begin
-                    // Timeout after ~80us at 25MHz
+                end else if (cycle_count > 5000) begin
+                    // Extended timeout for detailed debugging
                     $display("ERROR: Inference timeout after %d cycles!", cycle_count);
+                    $display("Final FSM State: %d", dut.accel.fsm.state);
+                    $display("Final FSM cycle_cnt: %d", dut.accel.fsm.cycle_cnt);
+                    $display("Final FSM row_idx: %d", dut.accel.fsm.row_idx);
                     $display("Check if memories are properly initialized");
                     state <= FINISHED;
                 end
@@ -159,23 +185,26 @@ module tb_single_test;
                     $display("Predicted Digit: %d", digit);
                     $display("Expected Digit:  %d", EXPECTED_DIGIT);
                     
+                    // Always show detailed computation results for debugging
+                    $display("\n=== DETAILED COMPUTATION RESULTS ===");
+                    $display("Final Layer 2 outputs (signed 20-bit):");
+                    $display("  Class 0: %d", dut.accel.l2_acc[0]);
+                    $display("  Class 1: %d", dut.accel.l2_acc[1]);
+                    $display("  Class 2: %d", dut.accel.l2_acc[2]);
+                    $display("  Class 3: %d", dut.accel.l2_acc[3]);
+                    $display("  Class 4: %d", dut.accel.l2_acc[4]);
+                    $display("  Class 5: %d", dut.accel.l2_acc[5]);
+                    $display("  Class 6: %d (Expected Maximum)", dut.accel.l2_acc[6]);
+                    $display("  Class 7: %d", dut.accel.l2_acc[7]);
+                    $display("  Class 8: %d", dut.accel.l2_acc[8]);
+                    $display("  Class 9: %d", dut.accel.l2_acc[9]);
+                    $display("Argmax result: %d", digit);
+                    $display("=======================================");
+                    
                     if (digit == EXPECTED_DIGIT) begin
-                        $display("Result: PASS");
+                        $display("Result: PASS - Correct prediction!");
                     end else begin
-                        $display("Result: FAIL");
-                        
-                        // Debug info on failure
-                        $display("\n=== DEBUG INFO ===");
-                        $display("FSM State: %d", dut.accel.fsm.state);
-                        $display("Layer 2 outputs:");
-                        $display("  l2_acc[0-4]: %d %d %d %d %d",
-                                dut.accel.l2_acc[0], dut.accel.l2_acc[1], 
-                                dut.accel.l2_acc[2], dut.accel.l2_acc[3], 
-                                dut.accel.l2_acc[4]);
-                        $display("  l2_acc[5-9]: %d %d %d %d %d",
-                                dut.accel.l2_acc[5], dut.accel.l2_acc[6],
-                                dut.accel.l2_acc[7], dut.accel.l2_acc[8],
-                                dut.accel.l2_acc[9]);
+                        $display("Result: FAIL - Wrong prediction!");
                     end
                     
                     $display("==========================================\n");
@@ -196,12 +225,14 @@ module tb_single_test;
     end
     
     // ==========================================
-    // Global timeout watchdog
+    // Global timeout watchdog - Extended for Vivado
     // ==========================================
     initial begin
-        #10000000;  // 10ms timeout
-        $display("ERROR: Global simulation timeout!");
+        #50000000;  // 50ms timeout - much longer for Vivado
+        $display("ERROR: Global simulation timeout after 50ms!");
         $display("Current state: %d", state);
+        $display("Cycle count: %d", cycle_count);
+        $display("FSM state: %d", dut.accel.fsm.state);
         $finish;
     end
     

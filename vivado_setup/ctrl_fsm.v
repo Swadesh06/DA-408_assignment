@@ -44,11 +44,24 @@ module ctrl_fsm (
     
     reg [3:0] state, next_state;
     
-    // State register
+    // State register with debug output
     always @(posedge clk) begin
         if (rst) begin
             state <= IDLE;
         end else begin
+            // Debug state transitions
+            if (state != next_state) begin
+                case (next_state)
+                    IDLE: $display("[FSM] Entering IDLE state");
+                    INIT: $display("[FSM] Entering INIT state");
+                    LOAD_IMG: $display("[FSM] Entering LOAD_IMG state");
+                    L1_COMP: $display("[FSM] Entering L1_COMP state - Processing 784 pixels");
+                    L1_RELU: $display("[FSM] Entering L1_RELU state - Applying activation");
+                    L2_COMP: $display("[FSM] Entering L2_COMP state - Processing 32 activations");
+                    ARGMAX: $display("[FSM] Entering ARGMAX state - Finding maximum");
+                    DONE: $display("[FSM] Entering DONE state - Inference complete");
+                endcase
+            end
             state <= next_state;
         end
     end
@@ -194,16 +207,23 @@ module ctrl_fsm (
                         if (cycle_cnt == 0) begin
                             // First cycle: bias initialization handled in mnist_top
                             mac_en_l1 <= 1'b0;
+                            $display("[L1_COMP] Starting L1 computation - initializing biases");
                         end else if (cycle_cnt >= 2 && cycle_cnt <= 785) begin
                             row_idx <= (cycle_cnt - 2);  // Start from pixel 0
                             mac_en_l1 <= 1'b1;
+                            // Debug every 100 pixels
+                            if ((cycle_cnt - 2) % 100 == 0) begin
+                                $display("[L1_COMP] Processing pixel %d of 784", cycle_cnt - 2);
+                            end
                         end else begin
                             mac_en_l1 <= 1'b0;  // Setup cycle
+                            if (cycle_cnt == 1) $display("[L1_COMP] Setup cycle complete");
                         end
                         cycle_cnt <= cycle_cnt + 1;
                     end else begin
                         mac_en_l1 <= 1'b0;
                         cycle_cnt <= 10'd0;
+                        $display("[L1_COMP] Completed all 784 pixels, moving to ReLU");
                     end
                 end
                 
@@ -232,13 +252,19 @@ module ctrl_fsm (
                         if (cycle_cnt > 0 && cycle_cnt <= 32) begin
                             row_idx <= (cycle_cnt - 1);  // Adjust for pipeline delay
                             mac_en_l2 <= 1'b1;
+                            // Debug every 10 activations
+                            if ((cycle_cnt - 1) % 10 == 0) begin
+                                $display("[L2_COMP] Processing activation %d of 32", cycle_cnt - 1);
+                            end
                         end else begin
                             mac_en_l2 <= 1'b0;  // First cycle: setup
+                            if (cycle_cnt == 0) $display("[L2_COMP] Starting L2 computation - initializing biases");
                         end
                         cycle_cnt <= cycle_cnt + 1;
                     end else begin
                         mac_en_l2 <= 1'b0;
                         cycle_cnt <= 10'd0;
+                        $display("[L2_COMP] Completed all 32 activations, moving to ARGMAX");
                     end
                 end
                 
@@ -247,12 +273,15 @@ module ctrl_fsm (
                     if (cycle_cnt == 0) begin
                         find_max <= 1'b1;
                         cycle_cnt <= cycle_cnt + 1;
+                        $display("[ARGMAX] Computing argmax of 10 output scores");
                     end else if (cycle_cnt == 1) begin
                         find_max <= 1'b0;  // Argmax computed, let it stabilize
                         cycle_cnt <= cycle_cnt + 1;
+                        $display("[ARGMAX] Argmax computation complete, stabilizing result");
                     end else begin
                         find_max <= 1'b0;
                         cycle_cnt <= 10'd0;
+                        $display("[ARGMAX] Moving to DONE state");
                     end
                 end
                 

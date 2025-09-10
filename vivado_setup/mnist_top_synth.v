@@ -34,7 +34,16 @@ module mnist_top_synth (
         $display("[TOP_MODULE] Center pixels[392:399] = %h %h %h %h %h %h %h %h",
                 test_img[392], test_img[393], test_img[394], test_img[395],
                 test_img[396], test_img[397], test_img[398], test_img[399]);
+        
+        // Additional verification of image content
+        $display("[TOP_MODULE] Critical pixels [400:407] = %h %h %h %h %h %h %h %h",
+                test_img[400], test_img[401], test_img[402], test_img[403],
+                test_img[404], test_img[405], test_img[406], test_img[407]);
         $display("[TOP_MODULE] Expected digit: %d", test_label);
+        
+        // Verify non-zero pixel count
+        #1;  // Wait for image to fully load
+        $display("[TOP_MODULE] Image loading verification complete");
     end
     
     // Image data preparation
@@ -43,13 +52,21 @@ module mnist_top_synth (
     
     // Load test image into img_data when start is pressed
     integer i;
+    reg start_prev;
     always @(posedge clk) begin
+        start_prev <= start;
         if (rst) begin
             img_data <= 0;
         end else if (start) begin
             // Load the single test image
             for (i = 0; i < IMG_SIZE; i = i + 1) begin
                 img_data[i*8 +: 8] <= test_img[i];
+            end
+            // Debug when start is first asserted
+            if (!start_prev) begin
+                $display("[IMG_LOAD] Loading image data on start pulse");
+                $display("[IMG_LOAD] Sample pixels being loaded: %h %h %h %h",
+                        test_img[400], test_img[401], test_img[402], test_img[403]);
             end
         end
     end
@@ -181,6 +198,11 @@ module mnist_accel_synth (
             for (i = 0; i < IMG_SIZE; i = i + 1) begin
                 img[i] <= img_data[i*8 +: 8];
             end
+            // Debug image loading into accelerator
+            $display("[ACCEL] Image loaded into accelerator");
+            $display("[ACCEL] Sample pixels from img_data: %h %h %h %h",
+                    img_data[400*8 +: 8], img_data[401*8 +: 8], 
+                    img_data[402*8 +: 8], img_data[403*8 +: 8]);
         end
     end
     
