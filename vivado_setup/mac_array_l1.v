@@ -1,6 +1,6 @@
 // MAC Array Layer 1 - 32 parallel MAC units for first layer computation
 // Processes 784 inputs in parallel across 32 neurons
-// Synthesizable for Basys3 FPGA
+// Synthesizable for Basys3 FPGA - Fixed for Vivado synthesis
 
 module mac_array_l1 (
     input clk,
@@ -9,10 +9,26 @@ module mac_array_l1 (
     input clr,                              // Clear accumulators
     input init_bias,                        // Initialize with biases
     input signed [7:0] pixel,               // Current pixel value (shared across all MACs)
-    input signed [7:0] weights [0:31],      // 32 weights for current pixel
-    input signed [7:0] biases [0:31],       // 32 bias values
-    output reg signed [19:0] acc_out [0:31] // 32 accumulator outputs
+    input [255:0] weights_packed,           // 32 * 8-bit weights packed
+    input [255:0] biases_packed,            // 32 * 8-bit biases packed
+    output [639:0] acc_out_packed           // 32 * 20-bit accumulator outputs packed
 );
+    
+    // Unpack inputs for internal use
+    wire signed [7:0] weights [0:31];
+    wire signed [7:0] biases [0:31];
+    reg signed [19:0] acc_out [0:31];
+    
+    generate
+        genvar j;
+        for (j = 0; j < 32; j = j + 1) begin : unpack_inputs
+            assign weights[j] = weights_packed[j*8 +: 8];
+            assign biases[j] = biases_packed[j*8 +: 8];
+        end
+        for (j = 0; j < 32; j = j + 1) begin : pack_outputs
+            assign acc_out_packed[j*20 +: 20] = acc_out[j];
+        end
+    endgenerate
     
     // Internal registers for accumulation
     reg signed [15:0] prod [0:31];

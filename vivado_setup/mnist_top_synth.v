@@ -146,16 +146,15 @@ module mnist_accel_synth (
     wire signed [7:0] l1_act [0:31];
     reg signed [7:0] l1_act_reg [0:31];
     
-    // Packed signals for ReLU unit (Vivado synthesis compatibility)
-    wire [639:0] l1_acc_packed;  // 32 * 20 bits = 640 bits
-    wire [255:0] l1_act_packed;  // 32 * 8 bits = 256 bits
+    // Packed signals for module interfaces (Vivado synthesis compatibility)
+    wire [639:0] l1_acc_packed;  // 32 * 20 bits = 640 bits (from MAC L1)
+    wire [255:0] l1_act_packed;  // 32 * 8 bits = 256 bits (from ReLU)
     
+    // Unpack signals for internal use
     generate
         genvar n;
-        for (n = 0; n < 32; n = n + 1) begin : pack_l1_acc
-            assign l1_acc_packed[n*20 +: 20] = l1_acc[n];
-        end
-        for (n = 0; n < 32; n = n + 1) begin : unpack_l1_act
+        for (n = 0; n < 32; n = n + 1) begin : unpack_l1_signals
+            assign l1_acc[n] = l1_acc_packed[n*20 +: 20];
             assign l1_act[n] = l1_act_packed[n*8 +: 8];
         end
     endgenerate
@@ -291,9 +290,9 @@ module mnist_accel_synth (
         .clr(mac_clr_l1),
         .init_bias(mac_l1_init_bias),
         .pixel(curr_pixel),
-        .weights(w1_out),
-        .biases(b1_out),
-        .acc_out(l1_acc)
+        .weights_packed(w1_out_packed),
+        .biases_packed(b1_out_packed),
+        .acc_out_packed(l1_acc_packed)
     );
     
     // ReLU Unit
@@ -305,6 +304,17 @@ module mnist_accel_synth (
         .a_out_packed(l1_act_packed)
     );
     
+    // Packed signal for Layer 2 output (from MAC to argmax)
+    wire [199:0] l2_acc_packed;  // 10 * 20 bits = 200 bits
+    
+    // Unpack l2_acc from packed version for internal use
+    generate
+        genvar j;
+        for (j = 0; j < 10; j = j + 1) begin : unpack_l2_acc
+            assign l2_acc[j] = l2_acc_packed[j*20 +: 20];
+        end
+    endgenerate
+    
     // MAC Array Layer 2
     mac_array_l2 mac_l2 (
         .clk(clk),
@@ -313,19 +323,10 @@ module mnist_accel_synth (
         .clr(mac_clr_l2),
         .init_bias(mac_l2_init_bias),
         .activation(curr_act),
-        .weights(w2_out),
-        .biases(b2_out),
-        .acc_out(l2_acc)
+        .weights_packed(w2_out_packed),
+        .biases_packed(b2_out_packed),
+        .acc_out_packed(l2_acc_packed)
     );
-    
-    // Pack l2_acc for argmax unit (Vivado synthesis compatibility)
-    wire [199:0] l2_acc_packed;  // 10 * 20 bits = 200 bits
-    generate
-        genvar j;
-        for (j = 0; j < 10; j = j + 1) begin : pack_l2_acc
-            assign l2_acc_packed[j*20 +: 20] = l2_acc[j];
-        end
-    endgenerate
     
     // Argmax unit
     wire [3:0] argmax_comb;
