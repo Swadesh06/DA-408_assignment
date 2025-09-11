@@ -294,12 +294,14 @@ module mnist_accel_synth (
         .max_idx(argmax_comb)
     );
 
-    // Latch prediction result and hold indefinitely
+    // Initialize and latch prediction result
     always @(posedge clk) begin
-        if (find_max) begin
+        if (rst) begin
+            argmax_idx <= 4'd0;  // Initialize to 0 on reset
+        end else if (find_max) begin
             argmax_idx <= argmax_comb;
         end
-        // Never clear - hold value until next prediction
+        // Hold value between predictions
     end
 
     // Output assignment - always show latest available prediction
