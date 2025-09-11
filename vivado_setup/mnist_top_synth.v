@@ -294,16 +294,15 @@ module mnist_accel_synth (
         .max_idx(argmax_comb)
     );
 
-    // Register argmax result
+    // Latch prediction result and hold indefinitely
     always @(posedge clk) begin
-        if (rst) begin
-            argmax_idx <= 4'd0;
-        end else if (find_max) begin
+        if (find_max) begin
             argmax_idx <= argmax_comb;
         end
+        // Never clear - hold value until next prediction
     end
 
-    // Output assignment
+    // Output assignment - always show latest available prediction
     assign pred_digit = argmax_idx;
 
 endmodule
