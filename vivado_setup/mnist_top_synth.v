@@ -17,7 +17,26 @@ module mnist_top_synth (
     initial begin
         $readmemh("test_img0.mem", test_img);
         test_label = 4'd6;
-        $display("[TOP_MODULE] Test image loaded, expected digit: %d", test_label);
+        
+        $display("==========================================");
+        $display("[TOP_MODULE] MNIST Image Loading");
+        $display("==========================================");
+        $display("Image file: test_img0.mem");
+        $display("Expected digit: %d", test_label);
+        $display("Sample pixels [0:7]: %h %h %h %h %h %h %h %h", 
+                test_img[0], test_img[1], test_img[2], test_img[3],
+                test_img[4], test_img[5], test_img[6], test_img[7]);
+        $display("Sample pixels [392:399]: %h %h %h %h %h %h %h %h",
+                test_img[392], test_img[393], test_img[394], test_img[395],
+                test_img[396], test_img[397], test_img[398], test_img[399]);
+        
+        // Verify non-zero content
+        if (test_img[0] == 0 && test_img[1] == 0 && test_img[100] == 0 && test_img[200] == 0) begin
+            $display("WARNING: Image appears to be mostly zeros - verify file loading");
+        end else begin
+            $display("SUCCESS: Image contains non-zero data");
+        end
+        $display("==========================================");
     end
 
     reg [6271:0] img_data;
@@ -25,12 +44,21 @@ module mnist_top_synth (
 
     // Pack test image into img_data on start signal
     integer i;
+    reg start_prev;
     always @(posedge clk) begin
+        start_prev <= start;
         if (rst) begin
             img_data <= 0;
         end else if (start) begin
             for (i = 0; i < IMG_SIZE; i = i + 1) begin
                 img_data[i*8 +: 8] <= test_img[i];
+            end
+            // Debug image transfer on start edge
+            if (!start_prev) begin
+                $display("[IMG_TRANSFER] Packing image data for inference");
+                $display("[IMG_TRANSFER] Source pixels [0:7]: %h %h %h %h %h %h %h %h",
+                        test_img[0], test_img[1], test_img[2], test_img[3],
+                        test_img[4], test_img[5], test_img[6], test_img[7]);
             end
         end
     end

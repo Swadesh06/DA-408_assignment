@@ -137,23 +137,41 @@ Program Device → Select .bit file → Program
 ## Test Image Configuration
 
 ### Default Test Image
-- Current: `test_img0.mem` (digit 6, loaded in mnist_top_synth.v line 24)
-- Location: `$readmemh("test_img0.mem", test_img);`
+- Current: `test_img0.mem` (digit 6, loaded in mnist_top_synth.v line 18)
+- Expected digit set on line 19
 
 ### Changing Test Images
-To test different digits:
-1. **Edit mnist_top_synth.v line 24**:
-   ```verilog
-   // Change from:
-   $readmemh("test_img0.mem", test_img);
-   // To (for digit 3):
-   $readmemh("test_images/test_img_digit3.mem", test_img);
-   ```
-2. **Update expected label line 27**:
-   ```verilog
-   test_label = 4'd3;  // Change to match selected digit
-   ```
-3. **Re-run simulation** to test new image
+To test different digits, modify **mnist_top_synth.v**:
+
+#### **Step 1: Change Image File (Line 18)**
+```verilog
+// BEFORE:
+$readmemh("test_img0.mem", test_img);
+
+// AFTER (for digit 3):
+$readmemh("test_images/test_img_digit3.mem", test_img);
+```
+
+#### **Step 2: Update Expected Digit (Line 19)** 
+```verilog
+// BEFORE:
+test_label = 4'd6;
+
+// AFTER (for digit 3):
+test_label = 4'd3;
+```
+
+#### **Step 3: Verify Changes**
+Run simulation and check console output:
+```
+[TOP_MODULE] Image file: test_images/test_img_digit3.mem
+[TOP_MODULE] Expected digit: 3
+[TOP_MODULE] Sample pixels [0:7]: 00 00 00 00 00 00 00 00
+[TOP_MODULE] SUCCESS: Image contains non-zero data
+```
+
+#### **Step 4: Re-run Simulation**
+The system should now predict the new digit correctly.
 
 ### Available Test Images
 ```
