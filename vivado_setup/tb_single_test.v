@@ -17,8 +17,7 @@ module tb_single_test;
     wire [3:0] digit;
     wire done;
 
-    // Expected result
-    localparam EXPECTED_DIGIT = 4'd6;  // test_img0 is digit 6
+    // Expected result - now read directly from DUT
 
     // Performance tracking
     reg [31:0] cycle_count;
@@ -61,7 +60,7 @@ module tb_single_test;
         $display("SINGLE IMAGE TEST - VIVADO COMPATIBLE");
         $display("==========================================");
         $display("Testing mnist_top_synth with test_img0");
-        $display("Expected digit: %d", EXPECTED_DIGIT);
+        #100 $display("Expected digit: %d", dut.test_label);
         $display("==========================================\n");
 
         // Initialize all signals
@@ -183,7 +182,7 @@ module tb_single_test;
                     $display("INFERENCE RESULT");
                     $display("==========================================");
                     $display("Predicted Digit: %d", digit);
-                    $display("Expected Digit:  %d", EXPECTED_DIGIT);
+                    $display("Expected Digit:  %d", dut.test_label);
 
                     // Always show detailed computation results for debugging
                     $display("\n=== DETAILED COMPUTATION RESULTS ===");
@@ -194,14 +193,14 @@ module tb_single_test;
                     $display("  Class 3: %d", dut.accel.l2_acc[3]);
                     $display("  Class 4: %d", dut.accel.l2_acc[4]);
                     $display("  Class 5: %d", dut.accel.l2_acc[5]);
-                    $display("  Class 6: %d (Expected Maximum)", dut.accel.l2_acc[6]);
+                    $display("  Class %d: %d (Expected Maximum)", dut.test_label, dut.accel.l2_acc[dut.test_label]);
                     $display("  Class 7: %d", dut.accel.l2_acc[7]);
                     $display("  Class 8: %d", dut.accel.l2_acc[8]);
                     $display("  Class 9: %d", dut.accel.l2_acc[9]);
                     $display("Argmax result: %d", digit);
                     $display("=======================================");
 
-                    if (digit == EXPECTED_DIGIT) begin
+                    if (digit == dut.test_label) begin
                         $display("Result: PASS - Correct prediction!");
                     end else begin
                         $display("Result: FAIL - Wrong prediction!");
