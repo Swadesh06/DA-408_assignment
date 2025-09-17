@@ -21,8 +21,10 @@ module mem_ctrl_synth (
     // Load weights and biases from memory files
     initial begin
         $readmemh("w1.mem", w1_mem);
-        $readmemh("b1.mem", b1_mem);
         $readmemh("w2.mem", w2_mem);
+    end
+    initial begin
+        $readmemh("b1.mem", b1_mem);
         $readmemh("b2.mem", b2_mem);
     end
 
