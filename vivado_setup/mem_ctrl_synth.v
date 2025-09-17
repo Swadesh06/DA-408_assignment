@@ -11,11 +11,12 @@ module mem_ctrl_synth (
     output [79:0] b2_out_packed
 );
 
-    // Memory arrays - will infer BRAM in Vivado
-    (* ram_style = "block" *) reg signed [7:0] w1_mem [0:25087];  // 784 * 32
-    (* ram_style = "block" *) reg signed [7:0] b1_mem [0:31];     // 32 biases
-    (* ram_style = "block" *) reg signed [7:0] w2_mem [0:319];    // 32 * 10
-    (* ram_style = "block" *) reg signed [7:0] b2_mem [0:9];      // 10 biases
+    // Memory arrays - Vivado will automatically infer appropriate storage
+    // Removed ram_style attribute to fix Vivado 2017.4 $readmemh bug
+    reg signed [7:0] w1_mem [0:25087];  // 784 * 32 - will use BRAM
+    reg signed [7:0] b1_mem [0:31];     // 32 biases - will use LUTs
+    reg signed [7:0] w2_mem [0:319];    // 32 * 10 - will use BRAM
+    reg signed [7:0] b2_mem [0:9];      // 10 biases - will use LUTs
 
     // Load weights and biases from memory files
     initial begin
@@ -55,14 +56,14 @@ module mem_ctrl_synth (
     integer i;
 
     always @(*) begin
-        // Default values
+        // Default to 1s instead of 0s for debugging - if LEDs show all 1s, memory failed
         for (i = 0; i < 32; i = i + 1) begin
-            w1_out[i] = 8'sd0;
-            b1_out[i] = 8'sd0;
+            w1_out[i] = 8'sd1;
+            b1_out[i] = 8'sd1;
         end
         for (i = 0; i < 10; i = i + 1) begin
-            w2_out[i] = 8'sd0;
-            b2_out[i] = 8'sd0;
+            w2_out[i] = 8'sd1;
+            b2_out[i] = 8'sd1;
         end
 
         case (layer_sel)

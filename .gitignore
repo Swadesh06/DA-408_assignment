@@ -13,3 +13,5 @@ logs/
 run_demo.sh
 project_instructions.md
 example_constraints.xdc
+reports/
+logs/

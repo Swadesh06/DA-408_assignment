@@ -11,7 +11,8 @@ module mnist_top_synth (
 
     localparam IMG_SIZE = 784;
 
-    (* ram_style = "block" *) reg [7:0] test_img [0:783];
+    // Removed ram_style attribute to fix Vivado 2017.4 $readmemh bug
+    reg [7:0] test_img [0:783];  // Will automatically use BRAM
     reg [3:0] test_label;
 
     initial begin
@@ -325,7 +326,7 @@ module mnist_accel_synth (
     // Initialize and latch prediction result
     always @(posedge clk) begin
         if (rst) begin
-            argmax_idx <= 4'd0;  // Initialize to 0 on reset
+            argmax_idx <= 4'd15;  // Initialize to all 1s (debug: if LEDs stay 1111, memory failed)
         end else if (find_max) begin
             argmax_idx <= argmax_comb;
         end
