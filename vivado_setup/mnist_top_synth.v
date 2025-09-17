@@ -6,7 +6,8 @@ module mnist_top_synth (
     input rst,
     input start,
     output [3:0] digit,
-    output done
+    output done,
+    output reg [7:0] fsm_leds  // FSM state monitoring LEDs
 );
 
     localparam IMG_SIZE = 784;
@@ -74,6 +75,30 @@ module mnist_top_synth (
     );
 
     assign digit = pred_digit;
+    
+    // FSM State Monitoring - Progressive LED pattern
+    // Each LED turns on as FSM reaches that state and stays on until reset
+    wire [3:0] fsm_state;
+    assign fsm_state = accel.fsm.state;
+    
+    always @(posedge clk) begin
+        if (rst) begin
+            fsm_leds <= 8'b00000000;  // All LEDs off on reset
+        end else begin
+            // Progressive pattern - LEDs accumulate as FSM progresses
+            case (fsm_state)
+                4'd0: fsm_leds <= fsm_leds;           // IDLE - keep current
+                4'd1: fsm_leds[0] <= 1'b1;            // INIT reached
+                4'd2: fsm_leds[1] <= 1'b1;            // LOAD_IMG reached
+                4'd3: fsm_leds[2] <= 1'b1;            // L1_COMP reached
+                4'd4: fsm_leds[3] <= 1'b1;            // L1_RELU reached
+                4'd5: fsm_leds[4] <= 1'b1;            // L2_COMP reached
+                4'd6: fsm_leds[5] <= 1'b1;            // ARGMAX reached
+                4'd7: fsm_leds[6] <= 1'b1;            // DONE reached
+                default: fsm_leds <= fsm_leds;        // Hold current state
+            endcase
+        end
+    end
 
 endmodule
 
