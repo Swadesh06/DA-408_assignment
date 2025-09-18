@@ -5,7 +5,7 @@ module mnist_top_synth (
     input clk,
     input rst,
     input start,
-    output reg [3:0] digit,
+    output [3:0] digit,        // Changed from reg to wire for continuous output
     output reg done,
     output reg [7:0] fsm_leds  // FSM state monitoring LEDs
 );
@@ -15,10 +15,7 @@ module mnist_top_synth (
     parameter HID_SIZE = 32;
     parameter OUT_SIZE = 10;
     
-    // ==============================================================
-    // CENTRALIZED MEMORY DECLARATIONS AND LOADING
-    // Following friend's approach - all memories in top module
-    // ==============================================================
+
     
     // Image memory
     reg signed [7:0] img_mem [0:IMG_SIZE-1];
@@ -31,9 +28,25 @@ module mnist_top_synth (
     reg signed [7:0] w2_mem [0:319];    // 32 * 10 = 320
     reg signed [7:0] b2_mem [0:9];      // 10 biases
     
+    // Variable for initialization loops
+    integer k;
+    
     // CRITICAL: Single initial block for ALL memory loading
     // This is what friend's code does and Vivado handles it properly
     initial begin
+        // FALLBACK: Initialize all memories to 1s (debugging indicator)
+        // If synthesis fails to load files, all 1s will be visible
+        for (k = 0; k < IMG_SIZE; k = k + 1) 
+            img_mem[k] = 8'h01;
+        for (k = 0; k < 25088; k = k + 1)
+            w1_mem[k] = 8'h01;
+        for (k = 0; k < 32; k = k + 1)
+            b1_mem[k] = 8'h01;
+        for (k = 0; k < 320; k = k + 1)
+            w2_mem[k] = 8'h01;
+        for (k = 0; k < 10; k = k + 1)
+            b2_mem[k] = 8'h01;
+        
         // Load all memory files in one initial block
         $readmemh("test_img0.mem", img_mem);
         $readmemh("w1.mem", w1_mem);
@@ -57,7 +70,7 @@ module mnist_top_synth (
                 b2_mem[0], b2_mem[1], b2_mem[2], b2_mem[3]);
         $display("==========================================");
     end
-    
+
     // ==============================================================
     // FSM STATES
     // ==============================================================
@@ -88,6 +101,10 @@ module mnist_top_synth (
     reg signed [7:0] l1_out [0:31];  // Layer 1 outputs after ReLU
     reg signed [19:0] l2_out [0:9];  // Layer 2 outputs (before argmax)
     
+    // Result preservation
+    reg [3:0] digit_latch;  // Latched digit result to preserve after DONE
+    reg inference_complete; // Flag to track if inference has completed
+    
     // Address calculation
     wire [14:0] w1_addr;
     wire [8:0] w2_addr;
@@ -95,6 +112,9 @@ module mnist_top_synth (
     // Sequential weight addressing
     assign w1_addr = hid_cnt * IMG_SIZE + pix_cnt;
     assign w2_addr = out_cnt * HID_SIZE + hid_cnt;
+    
+    // Output digit continuously (preserves value even when FSM returns to IDLE)
+    assign digit = digit_latch;
     
     // ==============================================================
     // FSM LOGIC
@@ -107,7 +127,7 @@ module mnist_top_synth (
             state <= next_state;
         end
     end
-    
+
     always @(*) begin
         next_state = state;
         
@@ -158,7 +178,7 @@ module mnist_top_synth (
     integer i;
     reg signed [19:0] max_val;
     reg [3:0] max_idx;
-    
+
     always @(posedge clk) begin
         if (rst) begin
             // Reset all counters
@@ -167,8 +187,9 @@ module mnist_top_synth (
             out_cnt <= 0;
             cyc_cnt <= 0;
             acc <= 0;
-            digit <= 0;
+            digit_latch <= 0;
             done <= 0;
+            inference_complete <= 0;
             
             // Reset max finding variables
             max_val <= -20'sd524288;  // Large negative value
@@ -183,23 +204,39 @@ module mnist_top_synth (
             
         end else begin
             
-            // Update FSM LEDs
+            // Update FSM LEDs - Accumulative pattern that persists
+            // Only add LEDs, don't clear previous ones (except on new start)
             case (state)
-                IDLE: fsm_leds <= 8'b00000001;
-                INIT: fsm_leds <= 8'b00000011;
-                L1_COMP: fsm_leds <= 8'b00000111;
-                L1_RELU: fsm_leds <= 8'b00001111;
-                L2_COMP: fsm_leds <= 8'b00011111;
-                ARGMAX: fsm_leds <= 8'b00111111;
-                DONE: fsm_leds <= 8'b01111111;
-                default: fsm_leds <= 8'b10000000;
+                IDLE: begin
+                    // Only reset LEDs when starting new inference
+                    if (start && !inference_complete)
+                        fsm_leds <= 8'b00000001;
+                    else if (!inference_complete)
+                        fsm_leds <= 8'b00000001;
+                    // else keep showing the complete pattern from last inference
+                end
+                INIT: fsm_leds[1] <= 1'b1;      // Add LED[1]
+                L1_COMP: fsm_leds[2] <= 1'b1;   // Add LED[2]
+                L1_RELU: fsm_leds[3] <= 1'b1;   // Add LED[3]
+                L2_COMP: fsm_leds[4] <= 1'b1;   // Add LED[4]
+                ARGMAX: fsm_leds[5] <= 1'b1;    // Add LED[5]
+                DONE: fsm_leds[6] <= 1'b1;      // Add LED[6]
+                default: fsm_leds[7] <= 1'b1;   // Error indicator
             endcase
             
             case (state)
                 
                 IDLE: begin
+                    // Keep done signal low in IDLE
                     done <= 0;
-                    digit <= 0;
+                    
+                    // Only clear digit_latch when starting new inference
+                    if (start) begin
+                        digit_latch <= 0;
+                        inference_complete <= 0;
+                    end
+                    // Otherwise preserve the last prediction
+                    
                     cyc_cnt <= 0;
                 end
                 
@@ -226,7 +263,7 @@ module mnist_top_synth (
                             // First pixel - initialize with bias
                             acc <= $signed(img_mem[pix_cnt]) * $signed(w1_mem[w1_addr]) + 
                                    ($signed(b1_mem[hid_cnt]) << 7); // Scale bias
-                        end else begin
+            end else begin
                             // Subsequent pixels - accumulate
                             acc <= acc + $signed(img_mem[pix_cnt]) * $signed(w1_mem[w1_addr]);
                         end
@@ -251,10 +288,10 @@ module mnist_top_synth (
                             l1_out[hid_cnt] <= acc[19] ? 8'd0 : 
                                              (acc[18:7] > 127) ? 8'd127 : acc[14:7];
                             cyc_cnt <= 2; // Stay for state transition
-                        end
-                    end
-                end
-                
+            end
+        end
+    end
+
                 L1_RELU: begin
                     // ReLU already applied during L1_COMP
                     // Initialize for Layer 2
@@ -318,14 +355,16 @@ module mnist_top_synth (
                         end
                         cyc_cnt <= cyc_cnt + 1;
                     end else begin
-                        digit <= max_idx;
+                        // Latch the final prediction
+                        digit_latch <= max_idx;
                         cyc_cnt <= 10;
                     end
                 end
                 
                 DONE: begin
                     done <= 1;
-                    // digit already set in ARGMAX
+                    inference_complete <= 1;  // Mark inference as complete
+                    // digit_latch already set in ARGMAX, will persist
                 end
                 
             endcase
