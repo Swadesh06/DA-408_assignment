@@ -12,13 +12,15 @@ module mnist_top_synth (
 
     localparam IMG_SIZE = 784;
 
-    // Removed ram_style attribute to fix Vivado 2017.4 $readmemh bug
-    reg [7:0] test_img [0:783];  // Will automatically use BRAM
+    // Memory for test image - will infer appropriate storage
+    reg [7:0] test_img [0:783];  // 784 pixels
     reg [3:0] test_label;
 
+    // Single initial block for memory loading (inspired by friend's approach)
     initial begin
+        // Load test image
         $readmemh("test_img0.mem", test_img);
-        test_label = 4'd6;
+        test_label = 4'd6;  // Expected label for test_img0
         
         $display("==========================================");
         $display("[TOP_MODULE] MNIST Image Loading");

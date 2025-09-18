@@ -11,21 +11,21 @@ module mem_ctrl_synth (
     output [79:0] b2_out_packed
 );
 
-    // Memory arrays - Vivado will automatically infer appropriate storage
-    // Removed ram_style attribute to fix Vivado 2017.4 $readmemh bug
-    reg signed [7:0] w1_mem [0:25087];  // 784 * 32 - will use BRAM
-    reg signed [7:0] b1_mem [0:31];     // 32 biases - will use LUTs
-    reg signed [7:0] w2_mem [0:319];    // 32 * 10 - will use BRAM
-    reg signed [7:0] b2_mem [0:9];      // 10 biases - will use LUTs
+    // Memory arrays - let Vivado choose optimal implementation
+    // Following friend's approach: no explicit ram_style attributes
+    reg signed [7:0] w1_mem [0:25087];  // 784 * 32 = 25088 bytes
+    reg signed [7:0] b1_mem [0:31];     // 32 bytes
+    reg signed [7:0] w2_mem [0:319];     // 32 * 10 = 320 bytes  
+    reg signed [7:0] b2_mem [0:9];       // 10 bytes
 
     // Load weights and biases from memory files
+    // CRITICAL FIX: Single initial block for ALL memories (like friend's code)
+    // Vivado 2017.4 has issues with multiple initial blocks
     initial begin
         $readmemh("w1.mem", w1_mem);
+        $readmemh("b1.mem", b1_mem);  // Moved to same block
         $readmemh("w2.mem", w2_mem);
-    end
-    initial begin
-        $readmemh("b1.mem", b1_mem);
-        $readmemh("b2.mem", b2_mem);
+        $readmemh("b2.mem", b2_mem);  // Moved to same block
     end
 
     // Address calculation
