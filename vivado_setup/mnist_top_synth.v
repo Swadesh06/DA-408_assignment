@@ -1,366 +1,374 @@
-// MNIST Hardware Accelerator Top Module
-// Test image loaded from test_img0.mem (change line 24 for different images)
+// MNIST Hardware Accelerator Top Module - Sequential Version
+// Centralized memory loading for reliable synthesis
 
 module mnist_top_synth (
     input clk,
     input rst,
     input start,
-    output [3:0] digit,
-    output done,
+    output [3:0] digit,        // Changed from reg to wire for continuous output
+    output reg done,
     output reg [7:0] fsm_leds  // FSM state monitoring LEDs
 );
 
-    localparam IMG_SIZE = 784;
+    // Parameters
+    parameter IMG_SIZE = 784;
+    parameter HID_SIZE = 32;
+    parameter OUT_SIZE = 10;
+    
 
-    // Memory for test image - will infer appropriate storage
-    reg [7:0] test_img [0:783];  // 784 pixels
-    reg [3:0] test_label;
-
-    // Single initial block for memory loading (inspired by friend's approach)
+    
+    // Image memory
+    reg signed [7:0] img_mem [0:IMG_SIZE-1];
+    
+    // Layer 1 memories (784x32 weights, 32 biases)
+    reg signed [7:0] w1_mem [0:25087];  // 784 * 32 = 25088
+    reg signed [7:0] b1_mem [0:31];     // 32 biases
+    
+    // Layer 2 memories (32x10 weights, 10 biases)  
+    reg signed [7:0] w2_mem [0:319];    // 32 * 10 = 320
+    reg signed [7:0] b2_mem [0:9];      // 10 biases
+    
+    // Variable for initialization loops
+    integer k;
+    
+    // CRITICAL: Single initial block for ALL memory loading
+    // This is what friend's code does and Vivado handles it properly
     initial begin
-        // Load test image
-        $readmemh("test_img0.mem", test_img);
-        test_label = 4'd6;  // Expected label for test_img0
+        // FALLBACK: Initialize all memories to 1s (debugging indicator)
+        // If synthesis fails to load files, all 1s will be visible
+        for (k = 0; k < IMG_SIZE; k = k + 1) 
+            img_mem[k] = 8'h01;
+        for (k = 0; k < 25088; k = k + 1)
+            w1_mem[k] = 8'h01;
+        for (k = 0; k < 32; k = k + 1)
+            b1_mem[k] = 8'h01;
+        for (k = 0; k < 320; k = k + 1)
+            w2_mem[k] = 8'h01;
+        for (k = 0; k < 10; k = k + 1)
+            b2_mem[k] = 8'h01;
         
-        $display("==========================================");
-        $display("[TOP_MODULE] MNIST Image Loading");
-        $display("==========================================");
-        $display("Image file: test_img0.mem");
-        $display("Expected digit: %d", test_label);
-        $display("Sample pixels [0:7]: %h %h %h %h %h %h %h %h", 
-                test_img[0], test_img[1], test_img[2], test_img[3],
-                test_img[4], test_img[5], test_img[6], test_img[7]);
-        $display("Sample pixels [392:399]: %h %h %h %h %h %h %h %h",
-                test_img[392], test_img[393], test_img[394], test_img[395],
-                test_img[396], test_img[397], test_img[398], test_img[399]);
+        // Load all memory files in one initial block
+        $readmemh("test_img0.mem", img_mem);
+        $readmemh("w1.mem", w1_mem);
+        $readmemh("b1.mem", b1_mem);
+        $readmemh("w2.mem", w2_mem);
+        $readmemh("b2.mem", b2_mem);
         
-        // Verify non-zero content
-        if (test_img[0] == 0 && test_img[1] == 0 && test_img[100] == 0 && test_img[200] == 0) begin
-            $display("WARNING: Image appears to be mostly zeros - verify file loading");
-        end else begin
-            $display("SUCCESS: Image contains non-zero data");
-        end
+        // Debug output
+        $display("==========================================");
+        $display("[TOP] Memory Loading Complete");
+        $display("==========================================");
+        $display("Image pixels [0:3]: %h %h %h %h", 
+                img_mem[0], img_mem[1], img_mem[2], img_mem[3]);
+        $display("W1 samples [0:3]: %h %h %h %h",
+                w1_mem[0], w1_mem[1], w1_mem[2], w1_mem[3]);
+        $display("B1 samples [0:3]: %h %h %h %h",
+                b1_mem[0], b1_mem[1], b1_mem[2], b1_mem[3]);
+        $display("W2 samples [0:3]: %h %h %h %h",
+                w2_mem[0], w2_mem[1], w2_mem[2], w2_mem[3]);
+        $display("B2 samples [0:3]: %h %h %h %h",
+                b2_mem[0], b2_mem[1], b2_mem[2], b2_mem[3]);
         $display("==========================================");
     end
 
-    reg [6271:0] img_data;
-    wire [3:0] pred_digit;
+    // ==============================================================
+    // FSM STATES
+    // ==============================================================
+    localparam IDLE     = 4'd0;
+    localparam INIT     = 4'd1;
+    localparam L1_COMP  = 4'd2;
+    localparam L1_RELU  = 4'd3;
+    localparam L2_COMP  = 4'd4;
+    localparam ARGMAX   = 4'd5;
+    localparam DONE     = 4'd6;
+    
+    reg [3:0] state, next_state;
+    
+    // ==============================================================
+    // INTERNAL REGISTERS AND COUNTERS
+    // ==============================================================
+    
+    // Counters for sequential processing
+    reg [9:0] pix_cnt;      // Pixel counter (0-783)
+    reg [4:0] hid_cnt;      // Hidden neuron counter (0-31)
+    reg [3:0] out_cnt;      // Output neuron counter (0-9)
+    reg [15:0] cyc_cnt;     // Cycle counter for timing
+    
+    // Accumulator for MAC operations
+    reg signed [19:0] acc;  // Wide enough for 8-bit MAC accumulation
+    
+    // Storage for layer outputs
+    reg signed [7:0] l1_out [0:31];  // Layer 1 outputs after ReLU
+    reg signed [19:0] l2_out [0:9];  // Layer 2 outputs (before argmax)
+    
+    // Result preservation
+    reg [3:0] digit_latch;  // Latched digit result to preserve after DONE
+    reg inference_complete; // Flag to track if inference has completed
+    
+    // Address calculation
+    wire [14:0] w1_addr;
+    wire [8:0] w2_addr;
+    
+    // Sequential weight addressing
+    assign w1_addr = hid_cnt * IMG_SIZE + pix_cnt;
+    assign w2_addr = out_cnt * HID_SIZE + hid_cnt;
+    
+    // Output digit continuously (preserves value even when FSM returns to IDLE)
+    assign digit = digit_latch;
+    
+    // ==============================================================
+    // FSM LOGIC
+    // ==============================================================
+    
+    always @(posedge clk) begin
+        if (rst) begin
+            state <= IDLE;
+        end else begin
+            state <= next_state;
+        end
+    end
 
-    // Pack test image into img_data on start signal
+    always @(*) begin
+        next_state = state;
+        
+        case (state)
+            IDLE: begin
+                if (start) next_state = INIT;
+            end
+            
+            INIT: begin
+                next_state = L1_COMP;
+            end
+            
+            L1_COMP: begin
+                // Move to ReLU when all neurons computed
+                if (hid_cnt == 31 && pix_cnt == 783 && cyc_cnt == 2)
+                    next_state = L1_RELU;
+            end
+            
+            L1_RELU: begin
+                // Single cycle for ReLU
+                next_state = L2_COMP;
+            end
+            
+            L2_COMP: begin
+                // Move to argmax when all output neurons computed
+                if (out_cnt == 9 && hid_cnt == 31 && cyc_cnt == 2)
+                    next_state = ARGMAX;
+            end
+            
+            ARGMAX: begin
+                // Stay in argmax for 10 cycles
+                if (cyc_cnt == 10)
+                    next_state = DONE;
+            end
+            
+            DONE: begin
+                if (!start) next_state = IDLE;
+            end
+            
+            default: next_state = IDLE;
+        endcase
+    end
+    
+    // ==============================================================
+    // DATAPATH - SEQUENTIAL MAC PROCESSING
+    // ==============================================================
+    
     integer i;
-    reg start_prev;
+    reg signed [19:0] max_val;
+    reg [3:0] max_idx;
+
     always @(posedge clk) begin
-        start_prev <= start;
         if (rst) begin
-            img_data <= 0;
-        end else if (start) begin
-            for (i = 0; i < IMG_SIZE; i = i + 1) begin
-                img_data[i*8 +: 8] <= test_img[i];
-            end
-            // Debug image transfer on start edge
-            if (!start_prev) begin
-                $display("[IMG_TRANSFER] Packing image data for inference");
-                $display("[IMG_TRANSFER] Source pixels [0:7]: %h %h %h %h %h %h %h %h",
-                        test_img[0], test_img[1], test_img[2], test_img[3],
-                        test_img[4], test_img[5], test_img[6], test_img[7]);
+            // Reset all counters
+            pix_cnt <= 0;
+            hid_cnt <= 0;
+            out_cnt <= 0;
+            cyc_cnt <= 0;
+            acc <= 0;
+            digit_latch <= 0;
+            done <= 0;
+            inference_complete <= 0;
+            
+            // Reset max finding variables
+            max_val <= -20'sd524288;  // Large negative value
+            max_idx <= 0;
+            
+            // Clear outputs
+            for (i = 0; i < 32; i = i + 1) l1_out[i] <= 0;
+            for (i = 0; i < 10; i = i + 1) l2_out[i] <= 0;
+            
+            // Clear LEDs
+            fsm_leds <= 8'b00000000;
+            
+        end else begin
+            
+            // Update FSM LEDs - Accumulative pattern that persists
+            // Only add LEDs, don't clear previous ones (except on new start)
+            case (state)
+                IDLE: begin
+                    // Only reset LEDs when starting new inference
+                    if (start && !inference_complete)
+                        fsm_leds <= 8'b00000001;
+                    else if (!inference_complete)
+                        fsm_leds <= 8'b00000001;
+                    // else keep showing the complete pattern from last inference
+                end
+                INIT: fsm_leds[1] <= 1'b1;      // Add LED[1]
+                L1_COMP: fsm_leds[2] <= 1'b1;   // Add LED[2]
+                L1_RELU: fsm_leds[3] <= 1'b1;   // Add LED[3]
+                L2_COMP: fsm_leds[4] <= 1'b1;   // Add LED[4]
+                ARGMAX: fsm_leds[5] <= 1'b1;    // Add LED[5]
+                DONE: fsm_leds[6] <= 1'b1;      // Add LED[6]
+                default: fsm_leds[7] <= 1'b1;   // Error indicator
+            endcase
+            
+            case (state)
+                
+                IDLE: begin
+                    // Keep done signal low in IDLE
+                    done <= 0;
+                    
+                    // Only clear digit_latch when starting new inference
+                    if (start) begin
+                        digit_latch <= 0;
+                        inference_complete <= 0;
+                    end
+                    // Otherwise preserve the last prediction
+                    
+                    cyc_cnt <= 0;
+                end
+                
+                INIT: begin
+                    // Initialize counters for Layer 1
+                    pix_cnt <= 0;
+                    hid_cnt <= 0;
+                    out_cnt <= 0;
+                    cyc_cnt <= 0;
+                    acc <= 0;
+                end
+                
+                L1_COMP: begin
+                    // Sequential Layer 1 computation
+                    // Process one pixel per cycle for current hidden neuron
+                    
+                    if (cyc_cnt == 0) begin
+                        // Cycle 0: Read weight and pixel
+                        cyc_cnt <= 1;
+                        
+                    end else if (cyc_cnt == 1) begin
+                        // Cycle 1: Multiply and accumulate
+                        if (pix_cnt == 0) begin
+                            // First pixel - initialize with bias
+                            acc <= $signed(img_mem[pix_cnt]) * $signed(w1_mem[w1_addr]) + 
+                                   ($signed(b1_mem[hid_cnt]) << 7); // Scale bias
+            end else begin
+                            // Subsequent pixels - accumulate
+                            acc <= acc + $signed(img_mem[pix_cnt]) * $signed(w1_mem[w1_addr]);
+                        end
+                        cyc_cnt <= 2;
+                        
+                    end else if (cyc_cnt == 2) begin
+                        // Cycle 2: Update counters
+                        if (pix_cnt < 783) begin
+                            // Next pixel
+                            pix_cnt <= pix_cnt + 1;
+                            cyc_cnt <= 0;
+                        end else if (hid_cnt < 31) begin
+                            // Store result and move to next hidden neuron
+                            l1_out[hid_cnt] <= acc[19] ? 8'd0 : 
+                                             (acc[18:7] > 127) ? 8'd127 : acc[14:7]; // ReLU + clamp
+                            hid_cnt <= hid_cnt + 1;
+                            pix_cnt <= 0;
+                            cyc_cnt <= 0;
+                            acc <= 0;
+                        end else begin
+                            // Last neuron - store and move to next state
+                            l1_out[hid_cnt] <= acc[19] ? 8'd0 : 
+                                             (acc[18:7] > 127) ? 8'd127 : acc[14:7];
+                            cyc_cnt <= 2; // Stay for state transition
             end
         end
     end
 
-    mnist_accel_synth accel (
-        .clk(clk),
-        .rst(rst),
-        .start(start),
-        .img_data(img_data),
-        .pred_digit(pred_digit),
-        .done(done)
-    );
-
-    assign digit = pred_digit;
-    
-    // FSM State Monitoring - Progressive LED pattern
-    // Each LED turns on as FSM reaches that state and stays on until reset
-    wire [3:0] fsm_state;
-    assign fsm_state = accel.fsm.state;
-    
-    always @(posedge clk) begin
-        if (rst) begin
-            fsm_leds <= 8'b00000000;  // All LEDs off on reset
-        end else begin
-            // Progressive pattern - LEDs accumulate as FSM progresses
-            case (fsm_state)
-                4'd0: fsm_leds <= fsm_leds;           // IDLE - keep current
-                4'd1: fsm_leds[0] <= 1'b1;            // INIT reached
-                4'd2: fsm_leds[1] <= 1'b1;            // LOAD_IMG reached
-                4'd3: fsm_leds[2] <= 1'b1;            // L1_COMP reached
-                4'd4: fsm_leds[3] <= 1'b1;            // L1_RELU reached
-                4'd5: fsm_leds[4] <= 1'b1;            // L2_COMP reached
-                4'd6: fsm_leds[5] <= 1'b1;            // ARGMAX reached
-                4'd7: fsm_leds[6] <= 1'b1;            // DONE reached
-                default: fsm_leds <= fsm_leds;        // Hold current state
+                L1_RELU: begin
+                    // ReLU already applied during L1_COMP
+                    // Initialize for Layer 2
+                    hid_cnt <= 0;
+                    out_cnt <= 0;
+                    cyc_cnt <= 0;
+                    acc <= 0;
+                end
+                
+                L2_COMP: begin
+                    // Sequential Layer 2 computation
+                    // Process one hidden neuron per cycle for current output neuron
+                    
+                    if (cyc_cnt == 0) begin
+                        // Cycle 0: Read weight and hidden value
+                        cyc_cnt <= 1;
+                        
+                    end else if (cyc_cnt == 1) begin
+                        // Cycle 1: Multiply and accumulate
+                        if (hid_cnt == 0) begin
+                            // First hidden - initialize with bias
+                            acc <= $signed(l1_out[hid_cnt]) * $signed(w2_mem[w2_addr]) + 
+                                   ($signed(b2_mem[out_cnt]) << 7);
+                        end else begin
+                            // Subsequent hidden - accumulate
+                            acc <= acc + $signed(l1_out[hid_cnt]) * $signed(w2_mem[w2_addr]);
+                        end
+                        cyc_cnt <= 2;
+                        
+                    end else if (cyc_cnt == 2) begin
+                        // Cycle 2: Update counters
+                        if (hid_cnt < 31) begin
+                            // Next hidden neuron
+                            hid_cnt <= hid_cnt + 1;
+                            cyc_cnt <= 0;
+                        end else if (out_cnt < 9) begin
+                            // Store result and move to next output neuron
+                            l2_out[out_cnt] <= acc;
+                            out_cnt <= out_cnt + 1;
+                            hid_cnt <= 0;
+                            cyc_cnt <= 0;
+                            acc <= 0;
+                        end else begin
+                            // Last neuron - store and move to argmax
+                            l2_out[out_cnt] <= acc;
+                            cyc_cnt <= 2; // Stay for state transition
+                        end
+                    end
+                end
+                
+                ARGMAX: begin
+                    // Find maximum output - sequential comparison
+                    if (cyc_cnt == 0) begin
+                        max_val <= l2_out[0];
+                        max_idx <= 4'd0;
+                        cyc_cnt <= 1;
+                    end else if (cyc_cnt <= 9) begin
+                        if ($signed(l2_out[cyc_cnt]) > $signed(max_val)) begin
+                            max_val <= l2_out[cyc_cnt];
+                            max_idx <= cyc_cnt[3:0];
+                        end
+                        cyc_cnt <= cyc_cnt + 1;
+                    end else begin
+                        // Latch the final prediction
+                        digit_latch <= max_idx;
+                        cyc_cnt <= 10;
+                    end
+                end
+                
+                DONE: begin
+                    done <= 1;
+                    inference_complete <= 1;  // Mark inference as complete
+                    // digit_latch already set in ARGMAX, will persist
+                end
+                
             endcase
         end
     end
-
-endmodule
-
-// MNIST Accelerator Core
-module mnist_accel_synth (
-    input clk,
-    input rst,
-    input start,
-    input [6271:0] img_data,
-    output [3:0] pred_digit,
-    output done
-);
-
-    localparam IMG_SIZE = 784;
-    localparam HID_SIZE = 32;
-    localparam OUT_SIZE = 10;
-
-    // Control signals
-    wire busy;
-    wire [1:0] layer_sel;
-    wire [9:0] row_idx;
-    wire mac_en_l1, mac_clr_l1;
-    wire mac_en_l2, mac_clr_l2;
-    wire load_img, comp_l1, apply_relu, comp_l2, find_max;
-    wire [9:0] cycle_cnt;
-
-    // Memory interface (packed for synthesis)
-    wire [255:0] w1_out_packed, b1_out_packed;
-    wire [79:0] w2_out_packed, b2_out_packed;
-
-    // Unpacked weights and biases
-    wire signed [7:0] w1_out [0:31];
-    wire signed [7:0] b1_out [0:31];
-    wire signed [7:0] w2_out [0:9];
-    wire signed [7:0] b2_out [0:9];
-
-    generate
-        genvar m;
-        for (m = 0; m < 32; m = m + 1) begin : unpack_w1_b1
-            assign w1_out[m] = w1_out_packed[m*8 +: 8];
-            assign b1_out[m] = b1_out_packed[m*8 +: 8];
-        end
-        for (m = 0; m < 10; m = m + 1) begin : unpack_w2_b2
-            assign w2_out[m] = w2_out_packed[m*8 +: 8];
-            assign b2_out[m] = b2_out_packed[m*8 +: 8];
-        end
-    endgenerate
-
-    // Image buffer
-    reg signed [7:0] img [0:783];
-    wire signed [7:0] curr_pixel;
-
-    // Layer 1 signals
-    wire signed [19:0] l1_acc [0:31];
-    wire signed [7:0] l1_act [0:31];
-    reg signed [7:0] l1_act_reg [0:31];
-
-    // Packed signals for module interfaces (Vivado synthesis compatibility)
-    wire [639:0] l1_acc_packed;  // 32 * 20 bits = 640 bits (from MAC L1)
-    wire [255:0] l1_act_packed;  // 32 * 8 bits = 256 bits (from ReLU)
-
-    // Unpack signals for internal use
-    generate
-        genvar n;
-        for (n = 0; n < 32; n = n + 1) begin : unpack_l1_signals
-            assign l1_acc[n] = l1_acc_packed[n*20 +: 20];
-            assign l1_act[n] = l1_act_packed[n*8 +: 8];
-        end
-    endgenerate
-
-    // Layer 2 signals
-    wire signed [19:0] l2_acc [0:9];
-    wire signed [7:0] curr_act;
-
-    // Output signals
-    reg [3:0] argmax_idx;
-
-    // Control signals for MAC arrays
-    reg mac_l1_init_bias;
-    reg mac_l2_init_bias;
-
-    integer i;
-
-    // Image loading and pixel selection
-    assign curr_pixel = (comp_l1 && row_idx < IMG_SIZE) ? img[row_idx] : 8'sd0;
-
-    always @(posedge clk) begin
-        if (rst) begin
-            for (i = 0; i < IMG_SIZE; i = i + 1) begin
-                img[i] <= 8'sd0;
-            end
-        end else if (load_img) begin
-            for (i = 0; i < IMG_SIZE; i = i + 1) begin
-                img[i] <= img_data[i*8 +: 8];
-            end
-            // Debug image loading into accelerator
-            $display("[ACCEL] Image loaded into accelerator");
-            $display("[ACCEL] Sample pixels from img_data: %h %h %h %h",
-                    img_data[400*8 +: 8], img_data[401*8 +: 8],
-                    img_data[402*8 +: 8], img_data[403*8 +: 8]);
-        end
-    end
-
-    // Layer 1 activation register
-    reg prev_apply_relu;
-    always @(posedge clk) begin
-        prev_apply_relu <= apply_relu;
-    end
-
-    always @(posedge clk) begin
-        if (rst) begin
-            for (i = 0; i < HID_SIZE; i = i + 1) begin
-                l1_act_reg[i] <= 8'sd0;
-            end
-        end else if (prev_apply_relu && !apply_relu) begin
-            for (i = 0; i < HID_SIZE; i = i + 1) begin
-                l1_act_reg[i] <= l1_act[i];
-            end
-        end
-    end
-
-    // Layer 2 activation selection
-    assign curr_act = (comp_l2 && row_idx < HID_SIZE) ? l1_act_reg[row_idx] : 8'sd0;
-
-    // Bias initialization control
-    reg l1_bias_done;
-    reg l2_bias_done;
-
-    always @(posedge clk) begin
-        if (rst) begin
-            mac_l1_init_bias <= 1'b0;
-            mac_l2_init_bias <= 1'b0;
-            l1_bias_done <= 1'b0;
-            l2_bias_done <= 1'b0;
-        end else begin
-            if (comp_l1 && !l1_bias_done) begin
-                mac_l1_init_bias <= 1'b1;
-            end else begin
-                mac_l1_init_bias <= 1'b0;
-            end
-
-            if (mac_l1_init_bias) begin
-                l1_bias_done <= 1'b1;
-            end else if (!comp_l1) begin
-                l1_bias_done <= 1'b0;
-            end
-
-            if (comp_l2 && !l2_bias_done) begin
-                mac_l2_init_bias <= 1'b1;
-            end else begin
-                mac_l2_init_bias <= 1'b0;
-            end
-
-            if (mac_l2_init_bias) begin
-                l2_bias_done <= 1'b1;
-            end else if (!comp_l2) begin
-                l2_bias_done <= 1'b0;
-            end
-        end
-    end
-
-    // Module instantiations
-
-    // Control FSM
-    ctrl_fsm fsm (
-        .clk(clk),
-        .rst(rst),
-        .start(start),
-        .done(done),
-        .busy(busy),
-        .layer_sel(layer_sel),
-        .row_idx(row_idx),
-        .mac_en_l1(mac_en_l1),
-        .mac_clr_l1(mac_clr_l1),
-        .mac_en_l2(mac_en_l2),
-        .mac_clr_l2(mac_clr_l2),
-        .load_img(load_img),
-        .comp_l1(comp_l1),
-        .apply_relu(apply_relu),
-        .comp_l2(comp_l2),
-        .find_max(find_max),
-        .cycle_cnt(cycle_cnt)
-    );
-
-    // Memory Controller with synthesis paths
-    mem_ctrl_synth memory (
-        .clk(clk),
-        .rst(rst),
-        .layer_sel(layer_sel),
-        .row_idx(row_idx),
-        .w1_out_packed(w1_out_packed),
-        .b1_out_packed(b1_out_packed),
-        .w2_out_packed(w2_out_packed),
-        .b2_out_packed(b2_out_packed)
-    );
-
-    // MAC Array Layer 1
-    mac_array_l1 mac_l1 (
-        .clk(clk),
-        .rst(rst),
-        .en(mac_en_l1),
-        .clr(mac_clr_l1),
-        .init_bias(mac_l1_init_bias),
-        .pixel(curr_pixel),
-        .weights_packed(w1_out_packed),
-        .biases_packed(b1_out_packed),
-        .acc_out_packed(l1_acc_packed)
-    );
-
-    // ReLU Unit
-    relu_unit relu (
-        .clk(clk),
-        .rst(rst),
-        .en(apply_relu),
-        .z_in_packed(l1_acc_packed),
-        .a_out_packed(l1_act_packed)
-    );
-
-    // Packed signal for Layer 2 output (from MAC to argmax)
-    wire [199:0] l2_acc_packed;  // 10 * 20 bits = 200 bits
-
-    // Unpack l2_acc from packed version for internal use
-    generate
-        genvar j;
-        for (j = 0; j < 10; j = j + 1) begin : unpack_l2_acc
-            assign l2_acc[j] = l2_acc_packed[j*20 +: 20];
-        end
-    endgenerate
-
-    // MAC Array Layer 2
-    mac_array_l2 mac_l2 (
-        .clk(clk),
-        .rst(rst),
-        .en(mac_en_l2),
-        .clr(mac_clr_l2),
-        .init_bias(mac_l2_init_bias),
-        .activation(curr_act),
-        .weights_packed(w2_out_packed),
-        .biases_packed(b2_out_packed),
-        .acc_out_packed(l2_acc_packed)
-    );
-
-    // Argmax unit
-    wire [3:0] argmax_comb;
-    argmax_unit argmax (
-        .scores_packed(l2_acc_packed),
-        .max_idx(argmax_comb)
-    );
-
-    // Initialize and latch prediction result
-    always @(posedge clk) begin
-        if (rst) begin
-            argmax_idx <= 4'd15;  // Initialize to all 1s (debug: if LEDs stay 1111, memory failed)
-        end else if (find_max) begin
-            argmax_idx <= argmax_comb;
-        end
-        // Hold value between predictions
-    end
-
-    // Output assignment - always show latest available prediction
-    assign pred_digit = argmax_idx;
-
+    
 endmodule
